@@ -73,12 +73,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => handleFirestoreError(error, OperationType.GET, 'locations'));
 
     // 2. Requests
-    const qRequests = query(collection(db, 'requests'), orderBy('dateRequested', 'desc'));
-    const unsubscribeRequests = onSnapshot(qRequests, (snapshot) => {
+    const unsubscribeRequests = onSnapshot(collection(db, 'requests'), (snapshot) => {
       const reqs: MaterialRequest[] = [];
       snapshot.forEach(doc => {
         reqs.push({ id: doc.id, ...doc.data() } as MaterialRequest);
       });
+      // Sort in memory as safety against missing fields in firestore
+      reqs.sort((a, b) => new Date(b.dateRequested).getTime() - new Date(a.dateRequested).getTime());
       setRequests(reqs);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'requests'));
 

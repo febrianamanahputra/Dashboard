@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../AppContext';
-import { Bell, X, HardHat, Truck, Wallet, Globe, LogOut, User } from 'lucide-react';
+import { Bell, X, HardHat, Truck, Wallet, Globe, LogOut, User, ArrowLeft } from 'lucide-react';
 import SMDashboard from './SM/SMDashboard';
 import SCMDashboard from './SCM/SCMDashboard';
 import FinanceDashboard from './Finance/FinanceDashboard';

@@ -15,6 +15,9 @@ export default function SCMDashboard() {
     requests: relevantRequests.filter(r => r.locationId === loc.id)
   })).filter(loc => loc.requests.length > 0);
 
+  // For debugging/safety: find requests that don't match any location
+  const orphanedRequests = relevantRequests.filter(r => !locations.some(l => l.id === r.locationId));
+
   return (
     <div className="relative min-h-[80vh] bg-white p-4 md:p-12 border border-slate-100 shadow-sm rounded-[32px] md:rounded-3xl">
       <div className="relative z-10 space-y-8 md:space-y-16">
@@ -26,52 +29,78 @@ export default function SCMDashboard() {
           <div className="hidden lg:flex items-center gap-12">
              <div className="text-right">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Permintaan</p>
-                <p className="text-3xl font-black text-emerald-600 tracking-tighter">{requests.length}</p>
+                <p className="text-3xl font-black text-emerald-600 tracking-tighter">{relevantRequests.length}</p>
              </div>
              <div className="w-px h-12 bg-slate-100" />
              <div className="text-right">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Lokasi Aktif</p>
-                <p className="text-3xl font-black text-teal-600 tracking-tighter">{locations.length}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Antrian Baru</p>
+                <p className="text-3xl font-black text-teal-600 tracking-tighter">{relevantRequests.filter(r => r.status === 'pending').length}</p>
              </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {locationsWithRequests.map(loc => (
-            <div key={loc.id} className="bg-slate-50/20 border border-slate-100 rounded-2xl p-8 hover:border-slate-200 transition-all flex flex-col h-full group">
-              <div className="flex items-center justify-between mb-8">
-                <div className="space-y-0.5">
-                  <h3 className="text-xl font-bold text-slate-800 group-hover:text-slate-600 transition-colors uppercase tracking-tight">{loc.name}</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Unit Lokasi</p>
-                </div>
-                <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-100">
-                  <span className="text-[11px] font-bold text-slate-600 uppercase">
-                    {loc.requests.filter(r => r.status === 'pending' || r.status === 'processing').length} Active
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-6 flex-1">
-                {loc.requests.length > 0 ? (
-                  loc.requests.map((req) => (
-                    <RequestItem 
-                      key={req.id} 
-                      request={req} 
-                      onStatusUpdate={updateRequestStatus} 
-                      onRequestPayment={setShowPaymentModal}
-                      locationName={loc.name}
-                    />
-                  ))
-                ) : (
-                  <div className="py-16 text-center bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-100 italic scale-95 opacity-50">
-                    <CheckCircle2 size={40} className="mx-auto text-emerald-200 mb-4" />
-                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em]">Antrian Kosong</p>
-                  </div>
-                )}
-              </div>
+        {locationsWithRequests.length === 0 && orphanedRequests.length === 0 ? (
+          <div className="py-24 text-center">
+            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Truck size={40} className="text-slate-200" />
             </div>
-          ))}
-        </div>
+            <h3 className="text-2xl font-bold text-slate-300">Belum Ada Permintaan</h3>
+            <p className="text-slate-400 mt-2">Semua logistik sedang stand-by.</p>
+          </div>
+        ) : (
+          <div className="space-y-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {locationsWithRequests.map(loc => (
+                <div key={loc.id} className="bg-slate-50/20 border border-slate-100 rounded-2xl p-8 hover:border-slate-200 transition-all flex flex-col h-full group">
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="space-y-0.5">
+                      <h3 className="text-xl font-bold text-slate-800 group-hover:text-slate-600 transition-colors uppercase tracking-tight">{loc.name}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Unit Lokasi</p>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-100">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase">
+                        {loc.requests.filter(r => r.status === 'pending' || r.status === 'processing').length} Active
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 flex-1">
+                    {loc.requests.map((req) => (
+                      <RequestItem 
+                        key={req.id} 
+                        request={req} 
+                        onStatusUpdate={updateRequestStatus} 
+                        onRequestPayment={setShowPaymentModal}
+                        locationName={loc.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {orphanedRequests.length > 0 && (
+              <div className="pt-12 border-t border-slate-100">
+                <div className="mb-8">
+                  <h3 className="text-lg font-bold text-slate-800">Permintaan Tanpa Lokasi</h3>
+                  <p className="text-sm text-slate-500">Muncul jika data lokasi tidak sinkron atau dihapus.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                  {orphanedRequests.map(req => (
+                    <div key={req.id} className="bg-rose-50/10 border border-rose-100 rounded-2xl p-6">
+                      <RequestItem 
+                        request={req} 
+                        onStatusUpdate={updateRequestStatus} 
+                        onRequestPayment={setShowPaymentModal}
+                        locationName="Lokasi Tidak Diketahui"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <AnimatePresence>

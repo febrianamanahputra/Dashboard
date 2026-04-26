@@ -15,6 +15,9 @@ export default function FinanceDashboard() {
     requests: relevantRequests.filter(r => r.locationId === loc.id)
   })).filter(loc => loc.requests.length > 0);
 
+  // For debugging/safety: find requests that don't match any location
+  const orphanedRequests = relevantRequests.filter(r => !locations.some(l => l.id === r.locationId));
+
   return (
     <div className="relative min-h-[80vh] bg-white p-4 md:p-12 border border-slate-100 shadow-sm rounded-[32px] md:rounded-3xl">
       <div className="relative z-10 space-y-8 md:space-y-16">
@@ -35,7 +38,7 @@ export default function FinanceDashboard() {
           </div>
         </header>
 
-        {locationsWithRequests.length === 0 ? (
+        {locationsWithRequests.length === 0 && orphanedRequests.length === 0 ? (
           <div className="h-[50vh] flex flex-col items-center justify-center text-center bg-rose-50/10 rounded-[40px] border-4 border-dashed border-rose-50">
              <div className="relative mb-8">
                 <div className="absolute inset-0 bg-emerald-100 rounded-full blur-3xl opacity-30 animate-ping" />
@@ -45,28 +48,49 @@ export default function FinanceDashboard() {
              <p className="text-slate-400 font-medium italic mt-2">Semua invoice material telah diselesaikan hari ini.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {locationsWithRequests.map(loc => (
-              <div key={loc.id} className="bg-slate-50/20 border border-slate-100 rounded-2xl p-8 hover:border-slate-200 transition-all group">
-                <div className="flex items-center justify-between mb-8 border-b border-slate-50 pb-6">
-                  <div className="space-y-0.5">
-                    <h3 className="text-xl font-bold text-slate-800 tracking-tight uppercase group-hover:text-slate-600 transition-colors">{loc.name}</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Finance Dept</p>
+          <div className="space-y-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {locationsWithRequests.map(loc => (
+                <div key={loc.id} className="bg-slate-50/20 border border-slate-100 rounded-2xl p-8 hover:border-slate-200 transition-all group">
+                  <div className="flex items-center justify-between mb-8 border-b border-slate-50 pb-6">
+                    <div className="space-y-0.5">
+                      <h3 className="text-xl font-bold text-slate-800 tracking-tight uppercase group-hover:text-slate-600 transition-colors">{loc.name}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Finance Dept</p>
+                    </div>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-100">
+                      <span className="text-[12px] font-bold text-slate-600 uppercase">
+                        {loc.requests.filter(r => r.status === 'awaiting_payment').length} Pending
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-100">
-                    <span className="text-[12px] font-bold text-slate-600 uppercase">
-                      {loc.requests.filter(r => r.status === 'awaiting_payment').length} Pending
-                    </span>
+
+                  <div className="space-y-6">
+                    {loc.requests.map(req => (
+                      <FinanceRequestItem key={req.id} request={req} onApprove={updateRequestStatus} />
+                    ))}
                   </div>
                 </div>
+              ))}
+            </div>
 
-                <div className="space-y-6">
-                  {loc.requests.map(req => (
-                    <FinanceRequestItem key={req.id} request={req} onApprove={updateRequestStatus} />
+            {orphanedRequests.length > 0 && (
+              <div className="pt-12 border-t border-slate-100">
+                <div className="mb-8">
+                  <h3 className="text-lg font-bold text-slate-800">Pembayaran Campuran / Tanpa Lokasi</h3>
+                  <p className="text-sm text-slate-500">Invoice yang lokasi asalnya tidak ditemukan.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                  {orphanedRequests.map(req => (
+                    <div key={req.id} className="bg-rose-50/10 border border-rose-100 rounded-2xl p-6">
+                      <FinanceRequestItem 
+                        request={req} 
+                        onApprove={updateRequestStatus} 
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
