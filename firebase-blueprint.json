@@ -1,0 +1,108 @@
+{
+  "entities": {
+    "Location": {
+      "title": "Location",
+      "description": "A construction site or project location representing a physical workspace.",
+      "type": "object",
+      "properties": {
+        "name": { 
+          "type": "string",
+          "description": "The unique display name of the location."
+        }
+      },
+      "required": ["name"]
+    },
+    "StockEntry": {
+      "title": "Stock Entry",
+      "description": "A record of material inventory currently available at a specific location.",
+      "type": "object",
+      "properties": {
+        "materialName": { "type": "string" },
+        "quantity": { "type": "number", "description": "Current quantity in stock." },
+        "unit": { "type": "string", "description": "Unit of measurement (e.g., m3, zak, kg)." },
+        "dateReceived": { "type": "number", "format": "timestamp" },
+        "locationName": { "type": "string" }
+      },
+      "required": ["materialName", "quantity", "unit", "dateReceived"]
+    },
+    "RAPItem": {
+      "title": "RAP Item",
+      "description": "Rencana Anggaran Perusahaan (Enterprise Budget Plan) item defining planned material usage.",
+      "type": "object",
+      "properties": {
+        "materialName": { "type": "string" },
+        "quantity": { "type": "number", "description": "Total planned budget quantity." },
+        "unit": { "type": "string" },
+        "totalOrdered": { "type": "number", "description": "Accumulated quantity ordered against this budget item." },
+        "locationId": { "type": "string" }
+      },
+      "required": ["materialName", "quantity", "unit", "totalOrdered", "locationId"]
+    },
+    "MaterialRequest": {
+      "title": "Material Request",
+      "description": "A formal request for materials from a site manager to the logistics team.",
+      "type": "object",
+      "properties": {
+        "materialName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "dateRequested": { "type": "string", "format": "date-time" },
+        "dateNeeded": { "type": "string", "format": "date" },
+        "locationId": { "type": "string" },
+        "status": { 
+          "type": "string", 
+          "enum": ["pending", "processing", "awaiting_payment", "paid", "delivered", "received", "on_hold"] 
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "timestamp": { "type": "number" }
+            }
+          }
+        },
+        "recipient": { "type": "string", "description": "Person who received the material at site." },
+        "deliverer": { "type": "string", "description": "Person/Vendor who delivered the material." }
+      },
+      "required": ["materialName", "quantity", "unit", "dateRequested", "locationId", "status", "history"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System-generated notification for real-time alerts across roles.",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "type": { "type": "string", "enum": ["info", "success", "update"] },
+        "locationName": { "type": "string" },
+        "targetRole": { "type": "string", "enum": ["SM", "SCM", "FINANCE", "RAP", "ALL"] },
+        "readBy": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["message", "timestamp", "type", "targetRole", "readBy"]
+    }
+  },
+  "firestore": {
+    "locations": {
+      "schema": "Location",
+      "description": "Collection of all site project locations."
+    },
+    "locations/{locationId}/stock": {
+      "schema": "StockEntry",
+      "description": "Nested material inventory records for a specific project."
+    },
+    "locations/{locationId}/rapData": {
+      "schema": "RAPItem",
+      "description": "Budget plan items specific to a project's cost center."
+    },
+    "requests": {
+      "schema": "MaterialRequest",
+      "description": "Central collection for all material logistics workflows."
+    },
+    "notifications": {
+      "schema": "Notification",
+      "description": "Broadcast and targeted alerts for dashboard users."
+    }
+  }
+}
