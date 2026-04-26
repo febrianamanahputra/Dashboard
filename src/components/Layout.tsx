@@ -94,7 +94,7 @@ export default function Layout() {
               transition={{ delay: 0.2 }}
               className="text-center mb-16"
             >
-              <h1 className="text-4xl font-semibold text-slate-900 tracking-tight mb-4">Project Dashboard</h1>
+              <h1 className="text-4xl font-semibold text-slate-900 tracking-tight mb-4">PROJECT DASHBOARD</h1>
               <p className="text-slate-400 text-base font-normal">Pilih divisi untuk mengakses dashboard operasional</p>
             </motion.div>
 
