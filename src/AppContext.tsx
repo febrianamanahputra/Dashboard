@@ -79,7 +79,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reqs.push({ id: doc.id, ...doc.data() } as MaterialRequest);
       });
       // Sort in memory as safety against missing fields in firestore
-      reqs.sort((a, b) => new Date(b.dateRequested).getTime() - new Date(a.dateRequested).getTime());
+      reqs.sort((a, b) => {
+        const dateA = a.dateRequested ? new Date(a.dateRequested).getTime() : 0;
+        const dateB = b.dateRequested ? new Date(b.dateRequested).getTime() : 0;
+        return dateB - dateA;
+      });
       setRequests(reqs);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'requests'));
 
@@ -213,8 +217,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const loc = locations.find(l => l.id === currentReq.locationId);
       const locName = loc?.name;
 
+      // 1. Read outside transaction (Queries cannot run inside transactions directly in Firestore Web SDK)
+      let existingStockRef = null;
+      let existingStockData = null;
+      if (newStatus === 'received' && currentReq.status !== 'received') {
+        const q = query(
+          collection(db, `locations/${currentReq.locationId}/stock`), 
+          where('materialName', '==', currentReq.materialName)
+        );
+        const stockSnapshot = await getDocs(q);
+        if (!stockSnapshot.empty) {
+          existingStockRef = stockSnapshot.docs[0].ref;
+          existingStockData = stockSnapshot.docs[0].data();
+        }
+      }
+
       await runTransaction(db, async (transaction) => {
-        // 1. Update status
+        // 2. Perform write
         const updatedHistory = [...currentReq.history, { status: newStatus, timestamp: Date.now() }];
         const updateData: any = {
           status: newStatus,
@@ -224,21 +243,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         transaction.update(doc(db, 'requests', requestId), updateData);
 
-        // 2. Update stock if received
+        // 3. Update stock if received
         if (newStatus === 'received' && currentReq.status !== 'received') {
-          // Find stock entry
-          const q = query(
-            collection(db, `locations/${currentReq.locationId}/stock`), 
-            where('materialName', '>=', currentReq.materialName),
-            where('materialName', '<=', currentReq.materialName + '\uf8ff')
-          );
-          const stockSnapshot = await getDocs(q);
-          const existingStock = stockSnapshot.docs.find(d => d.data().materialName.toLowerCase() === currentReq.materialName.toLowerCase());
           const addedQty = currentReq.quantity * 0.5;
-
-          if (existingStock) {
-            transaction.update(existingStock.ref, {
-              quantity: existingStock.data().quantity + addedQty,
+          if (existingStockRef) {
+            transaction.update(existingStockRef, {
+              quantity: (existingStockData?.quantity || 0) + addedQty,
               dateReceived: Date.now()
             });
           } else {

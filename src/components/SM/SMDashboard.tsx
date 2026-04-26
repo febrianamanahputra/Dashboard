@@ -19,10 +19,15 @@ export default function SMDashboard() {
   const [editQuantity, setEditQuantity] = useState<string>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [view, setView] = useState<'main' | 'rap'>('main');
+  const [showHistory, setShowHistory] = useState(false);
   const [receivingRequest, setReceivingRequest] = useState<MaterialRequest | null>(null);
 
   const activeLocation = locations.find(l => l.id === activeLocationId);
   const locationRequests = requests.filter(r => r.locationId === activeLocationId);
+  const filteredRequests = showHistory 
+    ? locationRequests 
+    : locationRequests.filter(r => r.status !== 'received' && r.status !== 'on_hold');
+  const onHoldRequests = locationRequests.filter(r => r.status === 'on_hold');
 
   const downloadRequests = () => {
     if (!activeLocation) return;
@@ -209,18 +214,34 @@ export default function SMDashboard() {
               {/* In Progress Area */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Aktifitas Sekarang</h3>
+                  <div className="flex items-center gap-6">
+                    <button 
+                      onClick={() => setShowHistory(false)}
+                      className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${!showHistory ? 'text-slate-900 border-b-2 border-slate-900 pb-1' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Aktifitas Sekarang
+                    </button>
+                    <button 
+                      onClick={() => setShowHistory(true)}
+                      className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${showHistory ? 'text-slate-900 border-b-2 border-slate-900 pb-1' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Riwayat Permintaan
+                    </button>
+                  </div>
                   <div className="h-px flex-1 bg-slate-50 mx-6" />
                 </div>
 
-                {locationRequests.filter(r => r.status !== 'received' && r.status !== 'on_hold').length === 0 && locationRequests.filter(r => r.status === 'on_hold').length === 0 ? (
+                {filteredRequests.length === 0 && onHoldRequests.length === 0 ? (
                   <div className="bg-slate-50/50 border border-dashed border-slate-200 rounded-3xl p-24 text-center">
                     <Package size={64} strokeWidth={1} className="mx-auto text-slate-200 mb-6" />
-                    <p className="text-slate-400 text-lg font-light italic">Belum ada pengiriman aktif.</p>
+                    <p className="text-slate-400 text-lg font-light italic">
+                      {showHistory ? 'Belum ada riwayat permintaan.' : 'Belum ada pengiriman aktif.'}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {locationRequests.filter(r => r.status !== 'received').map(req => (
+                    {/* Prepend on-hold if not in history view or just show everything in history view */}
+                    {(showHistory ? filteredRequests : [...filteredRequests, ...onHoldRequests]).map(req => (
                       <div key={req.id} className="bg-white border border-slate-100 p-6 rounded-2xl shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
                         <div className="flex justify-between items-start mb-6">
                           <div>

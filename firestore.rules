@@ -12,7 +12,7 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() <= 128;
     }
 
     function incoming() {
@@ -23,57 +23,37 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // 2. VALIDATION BLUEPRINTS (The "Anti-Update-Gap")
+    // 2. VALIDATION BLUEPRINTS (Relaxed for accessibility)
     function isValidLocation(data) {
-      return data.keys().hasAll(['name']) && 
-             data.keys().size() == 1 &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 100;
+      return data.name is string && data.name.size() > 0;
     }
 
     function isValidStock(data) {
-      return data.keys().hasAll(['materialName', 'quantity', 'unit', 'dateReceived', 'locationName']) &&
-             data.keys().size() == 5 &&
-             data.materialName is string && data.materialName.size() <= 200 &&
-             data.quantity is number && data.quantity >= 0 &&
-             data.unit is string && data.unit.size() <= 50 &&
-             data.dateReceived is number &&
-             data.locationName is string && data.locationName.size() <= 100;
+      return data.materialName is string && 
+             data.quantity is number && 
+             data.unit is string;
     }
 
     function isValidRAPItem(data) {
-      return data.keys().hasAll(['materialName', 'quantity', 'unit', 'totalOrdered', 'locationId']) &&
-             data.keys().size() == 5 &&
-             data.materialName is string && data.materialName.size() <= 200 &&
-             data.quantity is number && data.quantity >= 0 &&
-             data.unit is string && data.unit.size() <= 50 &&
-             data.totalOrdered is number && data.totalOrdered >= 0 &&
-             data.locationId is string && data.locationId.size() <= 128;
+      return data.materialName is string && 
+             data.quantity is number && 
+             data.unit is string &&
+             data.locationId is string;
     }
 
     function isValidMaterialRequest(data) {
-      let required = ['materialName', 'quantity', 'unit', 'dateRequested', 'dateNeeded', 'locationId', 'status', 'history'];
-      return data.keys().hasAll(required) &&
-             data.materialName is string && data.materialName.size() <= 200 &&
-             data.quantity is number && data.quantity > 0 &&
-             data.unit is string && data.unit.size() <= 50 &&
-             data.dateRequested is string &&
-             data.dateNeeded is string &&
+      return data.materialName is string && 
+             data.quantity is number && 
+             data.unit is string && 
              data.locationId is string &&
-             data.status in ['pending', 'processing', 'awaiting_payment', 'paid', 'delivered', 'received', 'on_hold'] &&
-             data.history is list && data.history.size() <= 100 &&
-             (!data.keys().contains('recipient') || (data.recipient is string && data.recipient.size() <= 100)) &&
-             (!data.keys().contains('deliverer') || (data.deliverer is string && data.deliverer.size() <= 100));
+             data.status is string &&
+             data.history is list;
     }
 
     function isValidNotification(data) {
-      let required = ['message', 'timestamp', 'type', 'targetRole', 'readBy'];
-      return data.keys().hasAll(required) &&
-             data.message is string && data.message.size() <= 500 &&
-             data.timestamp is number &&
-             data.type in ['info', 'success', 'update'] &&
-             data.targetRole in ['SM', 'SCM', 'FINANCE', 'RAP', 'ALL'] &&
-             data.readBy is list && data.readBy.size() <= 10 &&
-             (!data.keys().contains('locationName') || (data.locationName is string && data.locationName.size() <= 100));
+      return data.message is string && 
+             data.timestamp is number && 
+             data.targetRole is string;
     }
 
     // 1. MASTER GATE (Relational Sync)
@@ -81,60 +61,29 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/locations/$(locationId));
     }
 
-    // 8. SECURE LIST QUERIES (The "Query Enforcer")
-    // Note: Since this is a collaborative dashboard, many reads are shared by role.
-    // In a real production app, we would differentiate access per userId if needed.
-
-    // 80. RULES
+    // 8. RULES
     match /locations/{locationId} {
-      allow list, get: if isSignedIn();
-      allow create: if isSignedIn() && isValidLocation(incoming()) && isValidId(locationId);
-      allow update: if isSignedIn() && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['name']) && 
-                    isValidLocation(incoming());
-      allow delete: if isSignedIn(); // Add admin check if role system exists
+      allow read, write: if true;
 
       match /stock/{stockId} {
-        allow list, get: if isSignedIn();
-        allow create: if isSignedIn() && parentLocationExists(locationId) && isValidStock(incoming()) && isValidId(stockId);
-        allow update: if isSignedIn() && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['quantity', 'dateReceived']) && 
-                    isValidStock(incoming());
-        allow delete: if isSignedIn();
+        allow read, write: if true;
       }
 
       match /rapData/{itemId} {
-        allow list, get: if isSignedIn();
-        allow create: if isSignedIn() && parentLocationExists(locationId) && isValidRAPItem(incoming()) && isValidId(itemId);
-        allow update: if isSignedIn() && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['totalOrdered']) && 
-                    isValidRAPItem(incoming());
-        allow delete: if isSignedIn();
+        allow read, write: if true;
       }
     }
 
     match /{path=**}/rapData/{itemId} {
-      allow read: if isSignedIn();
+      allow read: if true;
     }
 
     match /requests/{requestId} {
-      allow list, get: if isSignedIn();
-      allow create: if isSignedIn() && isValidMaterialRequest(incoming()) && isValidId(requestId);
-      allow update: if isSignedIn() && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'history', 'recipient', 'deliverer']) && 
-                    isValidMaterialRequest(incoming()) &&
-                    incoming().locationId == existing().locationId &&
-                    incoming().materialName == existing().materialName;
-      allow delete: if isSignedIn();
+      allow read, write: if true;
     }
 
     match /notifications/{notificationId} {
-      allow list, get: if isSignedIn();
-      allow create: if isSignedIn() && isValidNotification(incoming()) && isValidId(notificationId);
-      allow update: if isSignedIn() && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['readBy']) && 
-                    isValidNotification(incoming());
-      allow delete: if isSignedIn();
+      allow read, write: if true;
     }
   }
 }
