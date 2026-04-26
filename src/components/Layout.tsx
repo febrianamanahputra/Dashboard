@@ -25,32 +25,10 @@ type Role = 'SM' | 'SCM' | 'FINANCE' | null;
 export default function Layout() {
   const [role, setRole] = useState<Role>(null);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [user, setUser] = useState(auth.currentUser);
-  const { notifications, dismissNotification, markNotificationsAsRead, accessToken, setAccessToken } = useApp();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
-    return () => unsubscribe();
-  }, []);
+  const { notifications, dismissNotification, markNotificationsAsRead, setAccessToken } = useApp();
 
   const handleGoogleLogin = async () => {
-    // 1. Firebase Auth for Firestore Rules
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      if (error.code === 'auth/popup-closed-by-user') {
-        console.log('User closed the login popup');
-        return;
-      }
-      console.error('Firebase Auth Error:', error);
-      alert('Gagal login ke Firebase. Cek koneksi.');
-      return;
-    }
-
-    // 2. Google OAuth for Sheets
+    // Google OAuth for Sheets ONLY (Firebase Auth removed)
     if (!google?.accounts?.oauth2) {
       console.warn('Google identity script not loaded yet');
       return;
@@ -78,13 +56,8 @@ export default function Layout() {
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setAccessToken(null);
-      setRole(null);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    setAccessToken(null);
+    setRole(null);
   };
 
   const filteredNotifications = notifications.filter(n => 
@@ -179,34 +152,19 @@ export default function Layout() {
                  {/* Real-time indicator */}
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
-                    <div className={`w-2 h-2 rounded-full ${user ? 'bg-emerald-500' : 'bg-slate-300'} animate-pulse`} />
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-[10px] uppercase tracking-tighter text-slate-400 font-bold">
-                      {user ? 'Cloud Sync' : 'ReadOnly'}
+                      Live Sync
                     </span>
                   </div>
 
-                  {!user ? (
-                    <button 
-                      onClick={handleGoogleLogin}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm"
-                    >
-                      <Globe size={12} className="text-blue-500" />
-                      Login Cloud
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      {user.photoURL && (
-                        <img src={user.photoURL} alt="Profile" className="w-6 h-6 rounded-full border border-slate-200" referrerPolicy="no-referrer" />
-                      )}
-                      <button 
-                        onClick={handleLogout}
-                        className="p-2 hover:bg-slate-50 rounded-full transition-colors text-slate-400 hover:text-slate-900"
-                        title="Logout"
-                      >
-                        <LogOut size={16} />
-                      </button>
-                    </div>
-                  )}
+                  <button 
+                    onClick={handleLogout}
+                    className="p-2 hover:bg-slate-50 rounded-full transition-colors text-slate-400 hover:text-slate-900"
+                    title="Reset Session"
+                  >
+                    <LogOut size={16} />
+                  </button>
                   
                   {/* Notification Center Trigger */}
                   <button 
