@@ -6,13 +6,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // 0.1 AUTH HELPERS
+    // 1. HELPERS
     function isSignedIn() {
+      // For this app, we allow public access to facilitate role switching in the demo
+      // In production, this should be: return request.auth != null;
       return true;
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128;
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -23,67 +25,88 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // 2. VALIDATION BLUEPRINTS (Relaxed for accessibility)
+    // 2. VALIDATION HELPERS
     function isValidLocation(data) {
-      return data.name is string && data.name.size() > 0;
+      return data.keys().hasAll(['name']) && 
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200;
     }
 
     function isValidStock(data) {
-      return data.materialName is string && 
-             data.quantity is number && 
-             data.unit is string;
+      return data.keys().hasAll(['materialName', 'quantity', 'unit', 'dateReceived']) &&
+             data.materialName is string && data.materialName.size() <= 200 &&
+             data.quantity is number &&
+             data.unit is string && data.unit.size() <= 50;
     }
 
     function isValidRAPItem(data) {
-      return data.materialName is string && 
-             data.quantity is number && 
-             data.unit is string &&
-             data.locationId is string;
+      return data.keys().hasAll(['materialName', 'quantity', 'unit', 'totalOrdered', 'locationId']) &&
+             data.materialName is string && data.materialName.size() <= 200 &&
+             data.quantity is number &&
+             data.unit is string && data.unit.size() <= 50 &&
+             data.locationId is string && isValidId(data.locationId);
     }
 
     function isValidMaterialRequest(data) {
-      return data.materialName is string && 
-             data.quantity is number && 
-             data.unit is string && 
-             data.locationId is string &&
+      return data.keys().hasAll(['materialName', 'quantity', 'unit', 'locationId', 'status', 'history']) &&
+             data.materialName is string && data.materialName.size() <= 200 &&
+             data.quantity is number &&
+             data.unit is string && data.unit.size() <= 50 &&
+             data.locationId is string && isValidId(data.locationId) &&
              data.status is string &&
-             data.history is list;
+             data.history is list && data.history.size() <= 100;
     }
 
     function isValidNotification(data) {
-      return data.message is string && 
-             data.timestamp is number && 
-             data.targetRole is string;
+      return data.keys().hasAll(['message', 'timestamp', 'targetRole', 'readBy']) &&
+             data.message is string && data.message.size() <= 1000 &&
+             data.timestamp is number &&
+             data.targetRole is string &&
+             data.readBy is list;
     }
 
-    // 1. MASTER GATE (Relational Sync)
-    function parentLocationExists(locationId) {
-      return exists(/databases/$(database)/documents/locations/$(locationId));
+    function isValidMainMaterial(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.unit is string && data.unit.size() > 0;
     }
 
-    // 8. RULES
-    match /locations/{locationId} {
+    // 3. COLLECTIONS
+    match /mainMaterials/{id} {
       allow read, write: if true;
+    }
+
+    match /locations/{locationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidLocation(incoming()) && isValidId(locationId);
+      allow update: if isSignedIn() && isValidLocation(incoming());
+      allow delete: if isSignedIn();
 
       match /stock/{stockId} {
-        allow read, write: if true;
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && isValidStock(incoming()) && isValidId(stockId);
       }
 
       match /rapData/{itemId} {
-        allow read, write: if true;
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && isValidRAPItem(incoming()) && isValidId(itemId);
       }
     }
 
     match /{path=**}/rapData/{itemId} {
-      allow read: if true;
+      allow read: if isSignedIn();
     }
 
     match /requests/{requestId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidMaterialRequest(incoming()) && isValidId(requestId);
+      allow update: if isSignedIn() && isValidMaterialRequest(incoming());
+      allow delete: if isSignedIn();
     }
 
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidNotification(incoming()) && isValidId(notificationId);
+      allow update: if isSignedIn() && isValidNotification(incoming());
+      allow delete: if isSignedIn();
     }
   }
 }

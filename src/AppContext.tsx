@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { MaterialRequest, Location, RequestStatus, Notification, RAPItem, StockEntry } from './types';
+import { MaterialRequest, Location, RequestStatus, Notification, RAPItem, StockEntry, MainMaterial } from './types';
 import { GoogleSheetsService, SpreadsheetRow } from './services/GoogleSheetsService';
 import { db, auth } from './lib/firebase';
 import { 
@@ -29,9 +29,17 @@ interface AppContextType {
   requests: MaterialRequest[];
   notifications: NotificationExtended[];
   rapData: RAPItem[];
+  mainMaterials: MainMaterial[];
   addLocation: (name: string) => void;
+  updateLocation: (id: string, name: string, imageUrl?: string) => void;
   removeLocation: (id: string) => void;
+  addMainMaterial: (name: string, unit: string) => void;
+  deleteMainMaterial: (id: string) => void;
   addRequest: (request: Omit<MaterialRequest, 'id' | 'status' | 'history'>) => void;
+  editRequest: (requestId: string, data: Partial<MaterialRequest>) => void;
+  approveEdit: (requestId: string) => void;
+  rejectEdit: (requestId: string) => void;
+  deleteRequest: (requestId: string) => void;
   updateRequestStatus: (requestId: string, newStatus: RequestStatus, extraData?: { recipient?: string; deliverer?: string }) => void;
   dismissNotification: (id: string) => void;
   markNotificationsAsRead: (role: 'SM' | 'SCM' | 'FINANCE' | 'RAP') => void;
@@ -48,6 +56,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [notifications, setNotifications] = useState<NotificationExtended[]>([]);
   const [rapData, setRapData] = useState<RAPItem[]>([]);
+  const [mainMaterials, setMainMaterials] = useState<MainMaterial[]>([]);
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Real-time Listeners
@@ -105,12 +114,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setNotifications(notifs);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'notifications'));
+    
+    // 5. Main Materials
+    const unsubscribeMainMaterials = onSnapshot(collection(db, 'mainMaterials'), (snapshot) => {
+      const items: MainMaterial[] = [];
+      snapshot.forEach(doc => {
+        items.push({ id: doc.id, ...doc.data() } as MainMaterial);
+      });
+      // Sort in memory to avoid needing a complex index initially
+      items.sort((a, b) => {
+        const timeA = (a as any).createdAt || 0;
+        const timeB = (b as any).createdAt || 0;
+        return timeB - timeA;
+      });
+      setMainMaterials(items);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'mainMaterials'));
 
     return () => {
       unsubscribeLocations();
       unsubscribeRequests();
       unsubscribeRap();
       unsubscribeNotifications();
+      unsubscribeMainMaterials();
     };
   }, []);
 
@@ -157,6 +182,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateLocation = async (id: string, name: string, imageUrl?: string) => {
+    try {
+      await updateDoc(doc(db, 'locations', id), { name, imageUrl });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `locations/${id}`);
+    }
+  };
+
   const removeLocation = async (id: string) => {
     try {
       const loc = locations.find(l => l.id === id);
@@ -164,6 +197,94 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addNotification(`Lokasi ${loc?.name} dihapus`, 'SM', 'info');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `locations/${id}`);
+    }
+  };
+
+  const addMainMaterial = useCallback(async (name: string, unit: string) => {
+    try {
+      if (!name.trim()) return;
+      await addDoc(collection(db, 'mainMaterials'), { 
+        name: name.trim(), 
+        unit: unit.toLowerCase(),
+        createdAt: Date.now()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'mainMaterials');
+    }
+  }, []);
+
+  const deleteMainMaterial = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'mainMaterials', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `mainMaterials/${id}`);
+    }
+  };
+
+  const editRequest = async (requestId: string, data: Partial<MaterialRequest>) => {
+    try {
+      const req = requests.find(r => r.id === requestId);
+      if (!req) return;
+
+      if (req.status === 'pending') {
+        // Direct edit
+        await updateDoc(doc(db, 'requests', requestId), data);
+        addNotification(`Request ${req.materialName} telah diperbarui langsung`, 'SCM', 'update');
+      } else {
+        // Request for edit (SCM must approve)
+        await updateDoc(doc(db, 'requests', requestId), {
+          pendingEdit: {
+            materialName: data.materialName || req.materialName,
+            quantity: data.quantity || req.quantity,
+            unit: data.unit || req.unit,
+            dateNeeded: data.dateNeeded || req.dateNeeded
+          }
+        });
+        const locName = locations.find(l => l.id === req.locationId)?.name;
+        addNotification(`Permintaan Edit untuk ${req.materialName} (${locName})`, 'SCM', 'update', locName);
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `requests/${requestId}`);
+    }
+  };
+
+  const approveEdit = async (requestId: string) => {
+    try {
+      const req = requests.find(r => r.id === requestId);
+      if (!req || !req.pendingEdit) return;
+
+      await updateDoc(doc(db, 'requests', requestId), {
+        ...req.pendingEdit,
+        pendingEdit: null
+      });
+      addNotification(`Edit untuk ${req.materialName} telah disetujui`, 'SM', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `requests/${requestId}`);
+    }
+  };
+
+  const rejectEdit = async (requestId: string) => {
+    try {
+      const req = requests.find(r => r.id === requestId);
+      if (!req) return;
+
+      await updateDoc(doc(db, 'requests', requestId), {
+        pendingEdit: null
+      });
+      addNotification(`Edit untuk ${req.materialName} ditolak oleh SCM`, 'SM', 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `requests/${requestId}`);
+    }
+  };
+
+  const deleteRequest = async (requestId: string) => {
+    try {
+      const req = requests.find(r => r.id === requestId);
+      if (!req) return;
+      await deleteDoc(doc(db, 'requests', requestId));
+      addNotification(`Request ${req.materialName} telah dibatalkan`, 'SCM', 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `requests/${requestId}`);
     }
   };
 
@@ -209,6 +330,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const syncDirectToSheet = async (req: MaterialRequest, locName: string) => {
+    const sheetUrl = import.meta.env.VITE_GOOGLE_SHEETS_URL;
+    if (!sheetUrl) {
+      console.warn('VITE_GOOGLE_SHEETS_URL belum dikonfigurasi di variabel lingkungan.');
+      return;
+    }
+
+    try {
+      await fetch(sheetUrl, {
+        method: 'POST',
+        mode: 'no-cors', // Apps Script web app with POST often needs no-cors or CORS handling
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: req.id,
+          locationName: locName,
+          materialName: req.materialName,
+          quantity: req.quantity,
+          unit: req.unit,
+          status: req.status,
+          dateRequested: req.dateRequested
+        }),
+      });
+      console.log('Successfully triggered direct sheet sync for:', req.materialName);
+    } catch (err) {
+      console.error('Direct Sheet sync failed:', err);
+    }
+  };
+
   const updateRequestStatus = async (requestId: string, newStatus: RequestStatus, extraData?: { recipient?: string; deliverer?: string }) => {
     try {
       const currentReq = requests.find(r => r.id === requestId);
@@ -217,9 +368,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const loc = locations.find(l => l.id === currentReq.locationId);
       const locName = loc?.name;
 
-      // 1. Read outside transaction (Queries cannot run inside transactions directly in Firestore Web SDK)
-      let existingStockRef = null;
-      let existingStockData = null;
+      await runTransaction(db, async (transaction) => {
+        // 1. MUST Read document in transaction before writing
+        const reqRef = doc(db, 'requests', requestId);
+        const reqDoc = await transaction.get(reqRef);
+        
+        if (!reqDoc.exists()) {
+          throw new Error("Permintaan tidak ditemukan di database.");
+        }
+
+        const reqData = reqDoc.data() as MaterialRequest;
+        
+        // 2. Prepare update data
+        const updatedHistory = [...(reqData.history || []), { status: newStatus, timestamp: Date.now() }];
+        const updateData: any = {
+          status: newStatus,
+          history: updatedHistory,
+          ...(extraData?.recipient ? { recipient: extraData.recipient } : {}),
+          ...(extraData?.deliverer ? { deliverer: extraData.deliverer } : {})
+        };
+
+        // 3. Perform update
+        transaction.update(reqRef, updateData);
+
+        // 4. Update stock if received
+        if (newStatus === 'received' && reqData.status !== 'received') {
+          // If we are receiving, we need to check stock. 
+          // Note: Queries in standard Firestore Transactions are tricky; 
+          // usually better to have a single stock doc per material or use a known ID.
+          // Since we already did getDocs outside earlier, we'll try to find it again inside if possible, 
+          // or just use setDoc with a deterministic ID if we want truly atomic.
+          // For now, we'll keep the logic but ensure we follow transaction rules.
+          
+          const addedQty = reqData.quantity; // Added full quantity (removed the * 0.5 test logic)
+          
+          // Since we can't easily query inside a transaction without knowing the ID, 
+          // let's use a deterministic ID for material-location stock if possible, 
+          // or just fallback to the outside read reference for now as it's better than before.
+          // BUT: transaction.get(query) is not valid.
+          // We'll stick to updating the request first.
+        }
+      });
+
+      // Stock logic refinement: move it to separate call or handle after transaction if purely additive
       if (newStatus === 'received' && currentReq.status !== 'received') {
         const q = query(
           collection(db, `locations/${currentReq.locationId}/stock`), 
@@ -227,50 +418,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
         const stockSnapshot = await getDocs(q);
         if (!stockSnapshot.empty) {
-          existingStockRef = stockSnapshot.docs[0].ref;
-          existingStockData = stockSnapshot.docs[0].data();
+          const sDoc = stockSnapshot.docs[0];
+          await updateDoc(sDoc.ref, {
+            quantity: (sDoc.data().quantity || 0) + currentReq.quantity,
+            dateReceived: Date.now()
+          });
+        } else {
+          await addDoc(collection(db, `locations/${currentReq.locationId}/stock`), {
+            materialName: currentReq.materialName,
+            quantity: currentReq.quantity,
+            unit: currentReq.unit,
+            dateReceived: Date.now(),
+            locationName: locName
+          });
         }
       }
 
-      await runTransaction(db, async (transaction) => {
-        // 2. Perform write
-        const updatedHistory = [...currentReq.history, { status: newStatus, timestamp: Date.now() }];
-        const updateData: any = {
-          status: newStatus,
-          history: updatedHistory,
-          ...(extraData?.recipient ? { recipient: extraData.recipient } : {}),
-          ...(extraData?.deliverer ? { deliverer: extraData.deliverer } : {})
-        };
-        transaction.update(doc(db, 'requests', requestId), updateData);
-
-        // 3. Update stock if received
-        if (newStatus === 'received' && currentReq.status !== 'received') {
-          const addedQty = currentReq.quantity * 0.5;
-          if (existingStockRef) {
-            transaction.update(existingStockRef, {
-              quantity: (existingStockData?.quantity || 0) + addedQty,
-              dateReceived: Date.now()
-            });
-          } else {
-            const newStockId = Math.random().toString(36).substring(7);
-            transaction.set(doc(db, `locations/${currentReq.locationId}/stock`, newStockId), {
-              materialName: currentReq.materialName,
-              quantity: addedQty,
-              unit: currentReq.unit,
-              dateReceived: Date.now(),
-              locationName: locName
-            });
-          }
-        }
-      });
-
       // Notification Logic
       const statusLabels: Record<RequestStatus, string> = {
-        pending: 'Antrian',
+        pending: 'Belum di proses',
         processing: 'Diproses',
         awaiting_payment: 'Menunggu Pembayaran',
-        paid: 'Sudah Dibayar',
-        delivered: 'Diantarkan',
+        paid: 'Pembayaran Berhasil',
+        delivered: 'Pengantaran',
         received: 'Diterima',
         on_hold: 'Hold / Indent'
       };
@@ -283,6 +453,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Sync update to Sheets
       if (accessToken) {
         syncToSheets({ ...currentReq, status: newStatus, ...(extraData || {}) } as MaterialRequest, locName || 'Unknown');
+      }
+
+      // Sync DIRECT to Sheet if received
+      if (newStatus === 'received') {
+        syncDirectToSheet({ ...currentReq, status: newStatus, ...(extraData || {}) } as MaterialRequest, locName || 'Unknown');
       }
 
     } catch (error) {
@@ -323,8 +498,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       requests,
       notifications,
       addLocation,
+      updateLocation,
       removeLocation,
+      addMainMaterial,
+      deleteMainMaterial,
       addRequest,
+      editRequest,
+      approveEdit,
+      rejectEdit,
+      deleteRequest,
       updateRequestStatus,
       dismissNotification,
       markNotificationsAsRead,

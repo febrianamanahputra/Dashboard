@@ -10,6 +10,12 @@ export interface StatusHistory {
   timestamp: number;
 }
 
+export interface MainMaterial {
+  id: string;
+  name: string;
+  unit: string;
+}
+
 export interface StockEntry {
   id: string;
   materialName: string;
@@ -40,12 +46,19 @@ export interface MaterialRequest {
   locationId: string;
   status: RequestStatus;
   history: StatusHistory[];
+  pendingEdit?: {
+    materialName: string;
+    quantity: number;
+    unit: string;
+    dateNeeded: string;
+  };
 }
 
 export interface Location {
   id: string;
   name: string;
   stock: StockEntry[];
+  imageUrl?: string;
 }
 
 export interface Notification {

@@ -81,9 +81,23 @@
         "readBy": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["message", "timestamp", "type", "targetRole", "readBy"]
+    },
+    "MainMaterial": {
+      "title": "Main Material",
+      "description": "Master material names available for SM to request.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "unit": { "type": "string" }
+      },
+      "required": ["name", "unit"]
     }
   },
   "firestore": {
+    "mainMaterials": {
+      "schema": "MainMaterial",
+      "description": "Collection of master material items."
+    },
     "locations": {
       "schema": "Location",
       "description": "Collection of all site project locations."

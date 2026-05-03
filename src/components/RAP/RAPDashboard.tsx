@@ -29,6 +29,9 @@ export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboard
     reader.onload = (evt) => {
       const bstr = evt.target?.result;
       const wb = XLSX.read(bstr, { type: 'binary' });
+      if (!wb.SheetNames || wb.SheetNames.length === 0) {
+        throw new Error('File Excel tidak memiliki sheet yang valid.');
+      }
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
@@ -103,29 +106,19 @@ export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboard
   };
 
   return (
-    <div className="relative min-h-[80vh] bg-white p-8 border border-slate-100 shadow-sm rounded-3xl overflow-hidden">
-      {/* Watermark Background */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.01] pointer-events-none select-none overflow-hidden h-full w-full flex items-center justify-center">
-        <FileSpreadsheet size={600} strokeWidth={1} className="text-slate-900" />
-      </div>
+    <div className="relative h-full flex flex-col bg-bg-alt overflow-hidden">
+      <div className="relative z-10 flex flex-col h-full overflow-hidden">
+        <div className="flex items-center justify-between shrink-0 p-4 bg-bg-base border-b border-border-ig">
+          {onBack && (
+            <button 
+              onClick={onBack}
+              className="p-2 text-ig-black hover:bg-bg-alt rounded-full transition-colors"
+            >
+              <ArrowLeft size={20} strokeWidth={2} />
+            </button>
+          )}
 
-      <div className="relative z-10 space-y-8">
-        {onBack && (
-          <button 
-            onClick={onBack}
-            className="flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-colors font-bold uppercase text-[10px] tracking-widest"
-          >
-            <ArrowLeft size={16} /> Kembali
-          </button>
-        )}
-        
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-50 pb-6">
-          <div className="space-y-0.5">
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">RAP Lokasi</h2>
-            <p className="text-slate-500 text-xs">Perencanaan material khusus untuk lokasi aktif.</p>
-          </div>
-          
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -135,125 +128,161 @@ export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboard
             />
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide hover:bg-slate-800 transition-all flex items-center gap-2"
+              className="text-ig-blue font-bold text-xs p-2"
             >
-              <Upload size={14} /> Import
+              Import
             </button>
             {currentRapData.length > 0 && (
               <button 
                 onClick={clearRAP}
-                className="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-rose-100 transition-all flex items-center gap-2"
+                className="text-red-500 font-bold text-xs p-2"
               >
-                <Trash2 size={14} /> Clear
+                Clear
               </button>
             )}
+          </div>
+        </div>
+        
+        <header className="flex flex-col px-6 py-8 bg-bg-base border-b border-border-ig shrink-0 gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-bg-alt border border-border-ig flex items-center justify-center">
+               <FileSpreadsheet size={24} className="text-ig-black" strokeWidth={2} />
+            </div>
+            <div>
+               <h2 className="text-lg font-bold tracking-tight">RAP Master</h2>
+               <p className="text-ig-grey text-[11px] font-medium uppercase tracking-wider">Sector Resource Planning</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+             <div className="ig-card px-4 py-2 flex flex-col gap-0.5">
+                <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider leading-none">Data Points</p>
+                <p className="text-base font-bold">{currentRapData.length}</p>
+             </div>
           </div>
         </header>
 
         {currentRapData.length === 0 ? (
-          <div className="bg-slate-50/30 border border-dashed border-slate-100 rounded-2xl p-16 text-center">
-            <p className="font-medium text-slate-400 text-sm">Belum ada data RAP untuk lokasi ini.</p>
-            <p className="text-[10px] text-slate-300 uppercase tracking-widest mt-2">Struktur Excel: Nama Material | Jumlah | Satuan</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-bg-base">
+            <div className="w-20 h-20 rounded-full border border-border-ig flex items-center justify-center mb-6 opacity-30">
+               <FileSpreadsheet size={40} strokeWidth={1} />
+            </div>
+            <h3 className="text-lg font-bold mb-1">No Vectors Defined</h3>
+            <p className="text-ig-grey text-sm mb-8">Import your spreadsheet to begin planning</p>
+            <div className="flex gap-2 text-[10px] font-bold text-ig-blue uppercase tracking-widest bg-bg-alt px-6 py-2 rounded-full border border-border-ig">
+               <span>Material</span>
+               <span className="opacity-30">•</span>
+               <span>Quantity</span>
+            </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-50">
-                  <th className="py-2 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nama Material</th>
-                  <th className="py-2 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">RAP Qty</th>
-                  <th className="py-2 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Total</th>
-                  <th className="py-2 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Stock</th>
-                  <th className="py-2 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Unit</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {currentRapData.map((item) => (
-                  <tr 
-                    key={item.id} 
-                    onClick={() => handleRequestEntry(item)}
-                    className="group hover:bg-slate-50/50 cursor-pointer transition-colors"
-                  >
-                    <td className="py-2 px-4">
-                      <span className="text-sm font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">{item.materialName}</span>
-                    </td>
-                    <td className="py-2 px-4 text-center">
-                      <span className="text-sm font-bold text-slate-900">{Math.floor(item.quantity)}</span>
-                    </td>
-                    <td className="py-2 px-4 text-center">
-                      <span className="text-xs font-bold text-blue-600">{Math.floor(item.totalOrdered || 0)}</span>
-                    </td>
-                    <td className="py-2 px-4 text-center">
-                      <span className={`text-xs font-bold ${getItemStock(item.materialName) > 0 ? 'text-emerald-500' : 'text-slate-300'}`}>
-                        {getItemStock(item.materialName)}
-                      </span>
-                    </td>
-                    <td className="py-2 px-4 text-right">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.unit}</span>
-                    </td>
+          <div className="flex-1 overflow-hidden bg-bg-alt flex flex-col">
+            <div className="overflow-y-auto flex-1 custom-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-bg-base z-20 border-b border-border-ig shadow-sm">
+                  <tr>
+                    <th className="py-4 px-6 text-[10px] font-bold text-ig-grey uppercase tracking-wider">Protocol</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-ig-grey uppercase tracking-wider text-center">Alloc</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-ig-grey uppercase tracking-wider text-center">Ord</th>
+                    <th className="py-4 px-4 text-[10px] font-bold text-ig-grey uppercase tracking-wider text-center">Stock</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border-ig">
+                  {currentRapData.map((item) => (
+                    <tr 
+                      key={item.id} 
+                      onClick={() => handleRequestEntry(item)}
+                      className="group bg-bg-base hover:bg-bg-alt cursor-pointer transition-colors active:opacity-60"
+                    >
+                      <td className="py-4 px-6">
+                        <span className="text-xs font-bold text-ig-black uppercase tracking-tight">{item.materialName}</span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="text-xs font-medium text-ig-grey">{Math.floor(item.quantity)}</span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="text-xs font-bold text-ig-blue">{Math.floor(item.totalOrdered || 0)}</span>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className={`text-xs font-bold ${getItemStock(item.materialName) > 0 ? 'text-green-600' : 'text-ig-grey italic opacity-30'}`}>
+                          {getItemStock(item.materialName)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       <AnimatePresence>
         {selectedItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
+          <div className="absolute inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl relative"
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative border border-border-ig flex flex-col"
             >
-              <button 
-                onClick={() => setSelectedItem(null)}
-                className="absolute top-6 right-6 text-slate-400 hover:text-slate-900"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-base font-bold">Request Deployment</h3>
+                <button 
+                  onClick={() => setSelectedItem(null)}
+                  className="text-ig-grey"
+                >
+                  <X size={24} />
+                </button>
+              </div>
 
               <div className="space-y-6">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Request Material dari RAP</p>
-                  <h3 className="text-2xl font-bold text-slate-900">{selectedItem.materialName}</h3>
+                <div className="flex items-center gap-4">
+                   <div className="w-12 h-12 bg-ig-blue text-white rounded-full flex items-center justify-center ">
+                     <Plus size={24} strokeWidth={3} />
+                   </div>
+                   <div>
+                     <p className="text-[10px] font-bold text-ig-blue uppercase tracking-wider">Protocol Entry</p>
+                     <h3 className="text-sm font-bold truncate max-w-[200px] uppercase">{selectedItem.materialName}</h3>
+                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-slate-50 rounded-2xl">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Target RAP</p>
-                    <p className="text-xl font-bold text-slate-900">{Math.floor(selectedItem.quantity)} <span className="text-xs uppercase">{selectedItem.unit}</span></p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-4 bg-bg-alt rounded-xl border border-border-ig">
+                    <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider mb-1">RAP Target</p>
+                    <p className="text-lg font-bold">{Math.floor(selectedItem.quantity)} <span className="text-[10px] text-ig-grey uppercase">{selectedItem.unit}</span></p>
                   </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Stock Sekarang</p>
-                    <p className="text-xl font-bold text-slate-900">{getItemStock(selectedItem.materialName)} <span className="text-xs uppercase">{selectedItem.unit}</span></p>
+                  <div className="p-4 bg-bg-alt rounded-xl border border-border-ig">
+                    <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider mb-1">In Stock</p>
+                    <p className="text-lg font-bold">{getItemStock(selectedItem.materialName)} <span className="text-[10px] text-ig-grey uppercase">{selectedItem.unit}</span></p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="relative">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Jumlah yang Diminta</label>
-                    <input 
-                      type="number"
-                      value={requestQty}
-                      onChange={(e) => setRequestQty(e.target.value)}
-                      placeholder="Masukkan jumlah..."
-                      className="w-full bg-slate-50 border-none rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                    {requestQty && (
-                      <div className="absolute top-10 right-4 flex items-center gap-1.5 bg-blue-600 text-white px-2 py-1 rounded-lg text-[10px] font-black">
-                        {calculatePercentage()}% <span className="opacity-60">DARI RAP</span>
-                      </div>
-                    )}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Quantity to Deploy</label>
+                    <div className="relative">
+                       <input 
+                        type="number"
+                        value={requestQty}
+                        onChange={(e) => setRequestQty(e.target.value)}
+                        placeholder="0"
+                        className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-lg font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+                        autoFocus
+                      />
+                      {requestQty && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-ig-blue text-white px-2 py-0.5 rounded text-[10px] font-bold">
+                          {calculatePercentage()}%
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5 text-left">
-                    <label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Tanggal Dibutuhkan</label>
-                    <input 
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Deadline Date</label>
+                     <input 
                       type="date" 
-                      className="w-full bg-slate-50 border-none rounded-xl px-4 py-4 text-sm focus:ring-2 focus:ring-slate-100 outline-none transition-all"
+                      className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
                       value={dateNeeded}
                       onChange={e => setDateNeeded(e.target.value)}
                     />
@@ -261,10 +290,10 @@ export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboard
 
                   <button 
                     onClick={submitRequest}
-                    disabled={!requestQty || Number(requestQty) <= 0}
-                    className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-200"
+                    disabled={!requestQty || Number(requestQty) <= 0 || isSubmitting}
+                    className="w-full mt-4 bg-ig-blue text-white py-4 rounded-md font-bold text-sm shadow-lg shadow-ig-blue/20 disabled:opacity-30 transition-all active:scale-95"
                   >
-                    Ajukan Permintaan
+                    {isSubmitting ? 'Calibrating...' : 'Deploy Request'}
                   </button>
                 </div>
               </div>
