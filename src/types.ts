@@ -42,10 +42,13 @@ export interface MaterialRequest {
   quantity: number;
   unit: string;
   dateRequested: string;
+  createdAt: number;
   dateNeeded: string;
   locationId: string;
   status: RequestStatus;
   history: StatusHistory[];
+  recipient?: string;
+  deliverer?: string;
   pendingEdit?: {
     materialName: string;
     quantity: number;

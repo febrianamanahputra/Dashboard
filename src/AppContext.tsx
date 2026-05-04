@@ -293,6 +293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...reqData,
       status: 'pending' as RequestStatus,
       history: [{ status: 'pending', timestamp: Date.now() }],
+      createdAt: Date.now()
     };
     try {
       const docRef = await addDoc(collection(db, 'requests'), newRequestData);
@@ -332,15 +333,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const syncDirectToSheet = async (req: MaterialRequest, locName: string) => {
     const sheetUrl = import.meta.env.VITE_GOOGLE_SHEETS_URL;
-    if (!sheetUrl) {
-      console.warn('VITE_GOOGLE_SHEETS_URL belum dikonfigurasi di variabel lingkungan.');
-      return;
-    }
+    if (!sheetUrl) return;
 
     try {
       await fetch(sheetUrl, {
         method: 'POST',
-        mode: 'no-cors', // Apps Script web app with POST often needs no-cors or CORS handling
+        mode: 'no-cors',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -349,12 +347,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           locationName: locName,
           materialName: req.materialName,
           quantity: req.quantity,
-          unit: req.unit,
-          status: req.status,
-          dateRequested: req.dateRequested
+          unit: req.unit.toUpperCase(),
+          dateRequested: req.createdAt ? new Date(req.createdAt).toLocaleDateString('id-ID') : (req.dateRequested || '-'),
+          dateNeeded: new Date(req.dateNeeded).toLocaleDateString('id-ID'),
+          dateReceived: new Date().toLocaleDateString('id-ID'),
+          recipient: req.recipient || '-',
+          deliverer: req.deliverer || '-',
+          status: 'Done'
         }),
       });
-      console.log('Successfully triggered direct sheet sync for:', req.materialName);
     } catch (err) {
       console.error('Direct Sheet sync failed:', err);
     }
