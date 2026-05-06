@@ -1,27 +1,37 @@
 {
   "entities": {
-    "Location": {
-      "title": "Location",
-      "description": "A construction site or project location representing a physical workspace.",
+    "Profile": {
+      "title": "Profile",
+      "description": "A high-level project profile representing a major project entity, often displayed as a story.",
       "type": "object",
       "properties": {
-        "name": { 
-          "type": "string",
-          "description": "The unique display name of the location."
-        }
+        "name": { "type": "string" },
+        "avatarUrl": { "type": "string", "description": "Base64 or URL of the project avatar." },
+        "createdAt": { "type": "number" }
       },
       "required": ["name"]
     },
+    "Sub": {
+      "title": "Sub",
+      "description": "A sub-location or sector within a Profile representing the actual workspace for material management.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "profileId": { "type": "string", "description": "Foreign key to the parent Profile." },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "profileId"]
+    },
     "StockEntry": {
       "title": "Stock Entry",
-      "description": "A record of material inventory currently available at a specific location.",
+      "description": "A record of material inventory currently available at a specific sub-location.",
       "type": "object",
       "properties": {
         "materialName": { "type": "string" },
         "quantity": { "type": "number", "description": "Current quantity in stock." },
         "unit": { "type": "string", "description": "Unit of measurement (e.g., m3, zak, kg)." },
         "dateReceived": { "type": "number", "format": "timestamp" },
-        "locationName": { "type": "string" }
+        "subId": { "type": "string" }
       },
       "required": ["materialName", "quantity", "unit", "dateReceived"]
     },
@@ -34,13 +44,13 @@
         "quantity": { "type": "number", "description": "Total planned budget quantity." },
         "unit": { "type": "string" },
         "totalOrdered": { "type": "number", "description": "Accumulated quantity ordered against this budget item." },
-        "locationId": { "type": "string" }
+        "locationId": { "type": "string", "description": "Maps to subId." }
       },
       "required": ["materialName", "quantity", "unit", "totalOrdered", "locationId"]
     },
     "MaterialRequest": {
       "title": "Material Request",
-      "description": "A formal request for materials from a site manager to the logistics team.",
+      "description": "A formal request for materials linked to a specific sub-location.",
       "type": "object",
       "properties": {
         "materialName": { "type": "string" },
@@ -48,7 +58,7 @@
         "unit": { "type": "string" },
         "dateRequested": { "type": "string", "format": "date-time" },
         "dateNeeded": { "type": "string", "format": "date" },
-        "locationId": { "type": "string" },
+        "subId": { "type": "string", "description": "The unique identifier for the Sub location." },
         "status": { 
           "type": "string", 
           "enum": ["pending", "processing", "awaiting_payment", "paid", "delivered", "received", "on_hold"] 
@@ -64,9 +74,11 @@
           }
         },
         "recipient": { "type": "string", "description": "Person who received the material at site." },
-        "deliverer": { "type": "string", "description": "Person/Vendor who delivered the material." }
+        "deliverer": { "type": "string", "description": "Person/Vendor who delivered the material." },
+        "createdAt": { "type": "number" },
+        "receivedAt": { "type": "number" }
       },
-      "required": ["materialName", "quantity", "unit", "dateRequested", "locationId", "status", "history"]
+      "required": ["materialName", "quantity", "unit", "dateRequested", "subId", "status", "history"]
     },
     "Notification": {
       "title": "Notification",
@@ -98,17 +110,21 @@
       "schema": "MainMaterial",
       "description": "Collection of master material items."
     },
-    "locations": {
-      "schema": "Location",
-      "description": "Collection of all site project locations."
+    "profiles": {
+      "schema": "Profile",
+      "description": "Collection of all high-level project profiles."
     },
-    "locations/{locationId}/stock": {
+    "subs": {
+      "schema": "Sub",
+      "description": "Collection of all project sub-locations."
+    },
+    "subs/{subId}/stock": {
       "schema": "StockEntry",
-      "description": "Nested material inventory records for a specific project."
+      "description": "Nested material inventory records for a specific sub-location."
     },
-    "locations/{locationId}/rapData": {
+    "subs/{subId}/rapData": {
       "schema": "RAPItem",
-      "description": "Budget plan items specific to a project's cost center."
+      "description": "Budget plan items specific to a project's sub-location."
     },
     "requests": {
       "schema": "MaterialRequest",

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../AppContext';
-import { Truck, Package, Clock, CheckCircle2, CreditCard, ChevronRight, Pause, Play, X, Send, History, Check, AlertTriangle, Trash2, Plus } from 'lucide-react';
+import { Truck, Package, Clock, CheckCircle2, CreditCard, ChevronRight, Pause, Play, X, Send, History, Check, AlertTriangle, Trash2, Plus, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { RequestStatus, MaterialRequest } from '../../types';
 
 export default function SCMDashboard() {
   const { 
-    locations = [], 
+    profiles = [],
+    subs = [], 
     requests = [], 
     updateRequestStatus, 
     approveEdit, 
@@ -14,7 +15,8 @@ export default function SCMDashboard() {
     deleteRequest, 
     mainMaterials = [], 
     addMainMaterial, 
-    deleteMainMaterial 
+    deleteMainMaterial,
+    syncDirectToSheet
   } = useApp();
   const [showPaymentModal, setShowPaymentModal] = useState<MaterialRequest | null>(null);
   const [showMainMaterialModal, setShowMainMaterialModal] = useState(false);
@@ -22,15 +24,15 @@ export default function SCMDashboard() {
 
   const relevantRequests = requests.filter(r => r.status !== 'received');
 
-  const locationsWithRequests = locations.map(loc => ({
-    ...loc,
-    requests: relevantRequests.filter(r => r.locationId === loc.id)
-  })).filter(loc => loc.requests.length > 0);
+  const subsWithRequests = subs.map(sub => ({
+    ...sub,
+    requests: relevantRequests.filter(r => r.subId === sub.id)
+  })).filter(sub => sub.requests.length > 0);
 
-  // History extraction per location
-  const historyByLocation = locations.map(loc => {
+  // History extraction per sub
+  const historyBySub = subs.map(sub => {
     const receivedReqs = requests
-      .filter(r => r.locationId === loc.id && r.status === 'received')
+      .filter(r => r.subId === sub.id && r.status === 'received')
       .map(r => {
         const receivedEntry = r.history.find(h => h.status === 'received');
         return {
@@ -40,10 +42,10 @@ export default function SCMDashboard() {
       })
       .sort((a, b) => b.receivedAt - a.receivedAt);
     
-    return { ...loc, history: receivedReqs };
-  }).filter(loc => loc.history.length > 0);
+    return { ...sub, history: receivedReqs };
+  }).filter(sub => sub.history.length > 0);
 
-  const orphanedRequests = relevantRequests.filter(r => !locations.some(l => l.id === r.locationId));
+  const orphanedRequests = relevantRequests.filter(r => !subs.some(s => s.id === r.subId));
 
   return (
     <div className="relative h-full flex flex-col bg-bg-base">
@@ -99,7 +101,7 @@ export default function SCMDashboard() {
         </header>
 
         {activeTab === 'active' ? (
-          locationsWithRequests.length === 0 && orphanedRequests.length === 0 ? (
+          subsWithRequests.length === 0 && orphanedRequests.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
               <div className="w-24 h-24 rounded-full border border-border-ig flex items-center justify-center mb-6 opacity-30">
                  <Truck size={48} strokeWidth={1} />
@@ -110,37 +112,42 @@ export default function SCMDashboard() {
           ) : (
             <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4 space-y-8">
               <div className="space-y-6">
-                {locationsWithRequests.map((loc, idx) => (
-                  <motion.div 
-                    key={loc.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="space-y-4"
-                  >
-                    <div className="flex items-center justify-between px-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-ig-blue" />
-                        <h3 className="text-sm font-bold tracking-tight">{loc.name}</h3>
+                {subsWithRequests.map((sub, idx) => {
+                  const profile = profiles.find(p => p.id === sub.profileId);
+                  return (
+                    <motion.div 
+                      key={sub.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className="space-y-4"
+                    >
+                      <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-ig-blue" />
+                          <h3 className="text-sm font-bold tracking-tight">
+                            {profile?.name} - {sub.name}
+                          </h3>
+                        </div>
+                        <span className="text-[10px] font-bold text-ig-grey uppercase">{sub.requests.length} Request</span>
                       </div>
-                      <span className="text-[10px] font-bold text-ig-grey uppercase">{loc.requests.length} Request</span>
-                    </div>
 
-                    <div className="space-y-4">
-                      {loc.requests.map((req) => (
-                        <RequestItem 
-                          key={req.id} 
-                          request={req} 
-                          onStatusUpdate={updateRequestStatus} 
-                          onApproveEdit={approveEdit}
-                          onRejectEdit={rejectEdit}
-                          onRequestPayment={setShowPaymentModal}
-                          locationName={loc.name}
-                        />
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
+                      <div className="space-y-4">
+                        {sub.requests.map((req) => (
+                          <RequestItem 
+                            key={req.id} 
+                            request={req} 
+                            onStatusUpdate={updateRequestStatus} 
+                            onApproveEdit={approveEdit}
+                            onRejectEdit={rejectEdit}
+                            onRequestPayment={setShowPaymentModal}
+                            locationName={`${profile?.name} - ${sub.name}`}
+                          />
+                        ))}
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
 
               {orphanedRequests.length > 0 && (
@@ -171,43 +178,59 @@ export default function SCMDashboard() {
         ) : (
           /* History View */
           <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4 space-y-8">
-            {historyByLocation.length === 0 ? (
+            {historyBySub.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-20 opacity-40">
                 <History size={48} />
                 <p className="mt-4 font-bold text-xs uppercase tracking-widest">Belum Ada Riwayat</p>
               </div>
             ) : (
-              historyByLocation.map(loc => (
-                <div key={loc.id} className="space-y-4">
-                   <div className="flex items-center gap-2 px-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
-                      <h3 className="text-sm font-bold tracking-tight">{loc.name}</h3>
-                    </div>
-                    <div className="ig-card divide-y divide-gray-50 overflow-hidden">
-                       {loc.history.map((item) => (
-                         <div key={item.id} className="p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                               <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600 border border-green-100">
-                                  <Package size={14} />
-                               </div>
-                               <div>
-                                  <p className="text-sm font-bold leading-tight">{item.materialName}</p>
-                                  <p className="text-[10px] text-ig-grey font-medium mt-0.5">
-                                     Diterima: {new Date((item as any).receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                  </p>
-                               </div>
-                            </div>
-                            <div className="text-right">
-                               <p className="text-lg font-bold tracking-tighter leading-none">
-                                  {item.quantity} 
-                               </p>
-                               <span className="text-[10px] text-ig-grey uppercase font-bold">{item.unit}</span>
-                            </div>
-                         </div>
-                       ))}
-                    </div>
-                </div>
-              ))
+              historyBySub.map(sub => {
+                const profile = profiles.find(p => p.id === sub.profileId);
+                const fullName = `${profile?.name} - ${sub.name}`;
+                return (
+                  <div key={sub.id} className="space-y-4">
+                     <div className="flex items-center gap-2 px-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                        <h3 className="text-sm font-bold tracking-tight">{fullName}</h3>
+                      </div>
+                      <div className="ig-card divide-y divide-gray-50 overflow-hidden">
+                         {sub.history.map((item) => (
+                           <div key={item.id} className="p-4 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                 <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600 border border-green-100">
+                                    <Package size={14} />
+                                 </div>
+                                 <div>
+                                    <p className="text-sm font-bold leading-tight">{item.materialName}</p>
+                                    <p className="text-[10px] text-ig-grey font-medium mt-0.5">
+                                       Diterima: {new Date((item as any).receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                 </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                 <button
+                                   onClick={() => {
+                                     syncDirectToSheet(item, fullName);
+                                     alert(`Sinkronisasi "${item.materialName}" dikirim ke Spreadsheet!`);
+                                   }}
+                                   className="p-2 rounded-full hover:bg-ig-blue/5 text-ig-grey hover:text-ig-blue transition-colors"
+                                   title="Backup to Spreadsheet"
+                                 >
+                                    <RefreshCw size={14} />
+                                 </button>
+                                 <div className="text-right">
+                                    <p className="text-lg font-bold tracking-tighter leading-none">
+                                       {item.quantity} 
+                                    </p>
+                                    <span className="text-[10px] text-ig-grey uppercase font-bold">{item.unit}</span>
+                                 </div>
+                              </div>
+                           </div>
+                         ))}
+                      </div>
+                  </div>
+                );
+              })
             )}
           </div>
         )}
@@ -225,7 +248,7 @@ export default function SCMDashboard() {
         {showPaymentModal && (
           <PaymentModal 
             request={showPaymentModal} 
-            locationName={locations.find(l => l.id === showPaymentModal.locationId)?.name || ''}
+            locationName={subs.find(s => s.id === showPaymentModal.subId)?.name || ''}
             onClose={() => setShowPaymentModal(null)}
             onConfirm={(requestId) => {
               updateRequestStatus(requestId, 'awaiting_payment');

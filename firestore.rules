@@ -26,9 +26,15 @@ service cloud.firestore {
     }
 
     // 2. VALIDATION HELPERS
-    function isValidLocation(data) {
+    function isValidProfile(data) {
       return data.keys().hasAll(['name']) && 
              data.name is string && data.name.size() > 0 && data.name.size() <= 200;
+    }
+
+    function isValidSub(data) {
+      return data.keys().hasAll(['name', 'profileId']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.profileId is string && isValidId(data.profileId);
     }
 
     function isValidStock(data) {
@@ -47,11 +53,11 @@ service cloud.firestore {
     }
 
     function isValidMaterialRequest(data) {
-      return data.keys().hasAll(['materialName', 'quantity', 'unit', 'locationId', 'status', 'history']) &&
+      return data.keys().hasAll(['materialName', 'quantity', 'unit', 'subId', 'status', 'history']) &&
              data.materialName is string && data.materialName.size() <= 200 &&
              data.quantity is number &&
              data.unit is string && data.unit.size() <= 50 &&
-             data.locationId is string && isValidId(data.locationId) &&
+             data.subId is string && isValidId(data.subId) &&
              data.status is string &&
              data.history is list && data.history.size() <= 100;
     }
@@ -74,10 +80,22 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    match /locations/{locationId} {
+    // Collection Group Security
+    match /{path=**}/rapData/{itemId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidLocation(incoming()) && isValidId(locationId);
-      allow update: if isSignedIn() && isValidLocation(incoming());
+    }
+
+    match /profiles/{profileId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidProfile(incoming()) && isValidId(profileId);
+      allow update: if isSignedIn() && isValidProfile(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    match /subs/{subId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidSub(incoming()) && isValidId(subId);
+      allow update: if isSignedIn() && isValidSub(incoming());
       allow delete: if isSignedIn();
 
       match /stock/{stockId} {
@@ -89,10 +107,6 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow write: if isSignedIn() && isValidRAPItem(incoming()) && isValidId(itemId);
       }
-    }
-
-    match /{path=**}/rapData/{itemId} {
-      allow read: if isSignedIn();
     }
 
     match /requests/{requestId} {

@@ -7,11 +7,11 @@ import { RAPItem, StockEntry } from '../../types';
 
 interface RAPDashboardProps {
   onBack?: () => void;
-  locationId: string;
+  subId: string;
   stock: StockEntry[];
 }
 
-export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboardProps) {
+export default function RAPDashboard({ onBack, subId, stock }: RAPDashboardProps) {
   const { rapData, setRapData, addRequest } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedItem, setSelectedItem] = useState<RAPItem | null>(null);
@@ -19,7 +19,7 @@ export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboard
   const [dateNeeded, setDateNeeded] = useState<string>(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const currentRapData = rapData.filter(item => item.locationId === locationId);
+  const currentRapData = rapData.filter(item => item.locationId === subId);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -40,21 +40,21 @@ export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboard
         .filter(row => row.length >= 3 && row[0] && row[1] !== undefined)
         .map((row) => ({
           id: Math.random().toString(36).substring(7),
-          locationId: locationId,
+          locationId: subId,
           materialName: String(row[0]),
           quantity: Math.floor(Number(row[1]) || 0),
           unit: row[2] ? String(row[2]) : 'pcs',
           totalOrdered: 0
         }));
 
-      setRapData(locationId, items);
+      setRapData(subId, items);
     };
     reader.readAsBinaryString(file);
   };
 
   const clearRAP = () => {
     if (confirm('Hapus semua data RAP untuk lokasi ini?')) {
-      setRapData(locationId, []);
+      setRapData(subId, []);
     }
   };
 
@@ -74,7 +74,7 @@ export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboard
       materialName: selectedItem.materialName,
       quantity: qty,
       unit: selectedItem.unit,
-      locationId: locationId,
+      subId: subId,
       dateRequested: new Date().toISOString(),
       dateNeeded: dateNeeded
     });
@@ -86,7 +86,7 @@ export default function RAPDashboard({ onBack, locationId, stock }: RAPDashboard
       }
       return item;
     });
-    setRapData(locationId, updatedRapData.filter(i => i.locationId === locationId));
+    setRapData(subId, updatedRapData.filter(i => i.locationId === subId));
 
     setSelectedItem(null);
     setRequestQty('');

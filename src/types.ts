@@ -36,6 +36,20 @@ export interface RAPItem {
   totalOrdered?: number;
 }
 
+export interface Sub {
+  id: string;
+  name: string;
+  profileId: string;
+  createdAt: number;
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  avatarUrl?: string; // Will store base64 or URL
+  createdAt: number;
+}
+
 export interface MaterialRequest {
   id: string;
   materialName: string;
@@ -44,7 +58,7 @@ export interface MaterialRequest {
   dateRequested: string;
   createdAt: number;
   dateNeeded: string;
-  locationId: string;
+  subId: string; // Linked to Sub ID
   status: RequestStatus;
   history: StatusHistory[];
   recipient?: string;
@@ -57,7 +71,7 @@ export interface MaterialRequest {
   };
 }
 
-export interface Location {
+export interface ProfileOld {
   id: string;
   name: string;
   stock: StockEntry[];

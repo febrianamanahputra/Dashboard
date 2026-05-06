@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { MaterialRequest, Location, RequestStatus, Notification, RAPItem, StockEntry, MainMaterial } from './types';
+import { MaterialRequest, Profile, Sub, RequestStatus, Notification, RAPItem, StockEntry, MainMaterial } from './types';
 import { GoogleSheetsService, SpreadsheetRow } from './services/GoogleSheetsService';
 import { db, auth } from './lib/firebase';
 import { 
@@ -25,14 +25,18 @@ interface NotificationExtended extends Notification {
 }
 
 interface AppContextType {
-  locations: Location[];
+  profiles: Profile[];
+  subs: Sub[];
   requests: MaterialRequest[];
   notifications: NotificationExtended[];
   rapData: RAPItem[];
   mainMaterials: MainMaterial[];
-  addLocation: (name: string) => void;
-  updateLocation: (id: string, name: string, imageUrl?: string) => void;
-  removeLocation: (id: string) => void;
+  addProfile: (name: string, avatarUrl?: string) => void;
+  updateProfile: (id: string, name: string, avatarUrl?: string) => void;
+  removeProfile: (id: string) => void;
+  addSub: (name: string, profileId: string) => void;
+  updateSub: (id: string, name: string) => void;
+  removeSub: (id: string) => void;
   addMainMaterial: (name: string, unit: string) => void;
   deleteMainMaterial: (id: string) => void;
   addRequest: (request: Omit<MaterialRequest, 'id' | 'status' | 'history'>) => void;
@@ -43,43 +47,43 @@ interface AppContextType {
   updateRequestStatus: (requestId: string, newStatus: RequestStatus, extraData?: { recipient?: string; deliverer?: string }) => void;
   dismissNotification: (id: string) => void;
   markNotificationsAsRead: (role: 'SM' | 'SCM' | 'FINANCE' | 'RAP') => void;
-  setRapData: (locationId: string, data: RAPItem[]) => void;
-  updateStock: (locationId: string, stockId: string, newQuantity: number) => void;
+  setRapData: (subId: string, data: RAPItem[]) => void;
+  updateStock: (subId: string, stockId: string, newQuantity: number) => void;
   accessToken: string | null;
   setAccessToken: (token: string | null) => void;
+  syncDirectToSheet: (req: MaterialRequest, locName: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [subs, setSubs] = useState<Sub[]>([]);
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [notifications, setNotifications] = useState<NotificationExtended[]>([]);
-  const [rapData, setRapData] = useState<RAPItem[]>([]);
+  const [rapData, setRapItems] = useState<RAPItem[]>([]);
   const [mainMaterials, setMainMaterials] = useState<MainMaterial[]>([]);
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Real-time Listeners
   useEffect(() => {
-    // 1. Locations with their stock subcollections
-    const unsubscribeLocations = onSnapshot(collection(db, 'locations'), (snapshot) => {
-      const locs: Location[] = [];
+    // 1. Profiles
+    const unsubscribeProfiles = onSnapshot(collection(db, 'profiles'), (snapshot) => {
+      const projs: Profile[] = [];
       snapshot.forEach(doc => {
-        locs.push({ id: doc.id, ...doc.data(), stock: [] } as Location);
+        projs.push({ id: doc.id, ...doc.data() } as Profile);
       });
-      setLocations(locs);
+      setProfiles(projs);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'profiles'));
 
-      // Fetch stock for each location (or use collectionGroup for all stock)
-      locs.forEach(loc => {
-        onSnapshot(collection(db, `locations/${loc.id}/stock`), (stockSnapshot) => {
-          const stocks: StockEntry[] = [];
-          stockSnapshot.forEach(sDoc => {
-            stocks.push({ id: sDoc.id, ...sDoc.data() } as StockEntry);
-          });
-          setLocations(prev => prev.map(l => l.id === loc.id ? { ...l, stock: stocks } : l));
-        }, (error) => handleFirestoreError(error, OperationType.GET, `locations/${loc.id}/stock`));
+    // 1b. Subs
+    const unsubscribeSubs = onSnapshot(collection(db, 'subs'), (snapshot) => {
+      const sbs: Sub[] = [];
+      snapshot.forEach(doc => {
+        sbs.push({ id: doc.id, ...doc.data() } as Sub);
       });
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'locations'));
+      setSubs(sbs);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'subs'));
 
     // 2. Requests
     const unsubscribeRequests = onSnapshot(collection(db, 'requests'), (snapshot) => {
@@ -87,7 +91,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       snapshot.forEach(doc => {
         reqs.push({ id: doc.id, ...doc.data() } as MaterialRequest);
       });
-      // Sort in memory as safety against missing fields in firestore
       reqs.sort((a, b) => {
         const dateA = a.dateRequested ? new Date(a.dateRequested).getTime() : 0;
         const dateB = b.dateRequested ? new Date(b.dateRequested).getTime() : 0;
@@ -102,7 +105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       snapshot.forEach(doc => {
         items.push({ id: doc.id, ...doc.data() } as RAPItem);
       });
-      setRapData(items);
+      setRapItems(items);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'rapData (collectionGroup)'));
 
     // 4. Notifications
@@ -121,7 +124,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       snapshot.forEach(doc => {
         items.push({ id: doc.id, ...doc.data() } as MainMaterial);
       });
-      // Sort in memory to avoid needing a complex index initially
       items.sort((a, b) => {
         const timeA = (a as any).createdAt || 0;
         const timeB = (b as any).createdAt || 0;
@@ -131,7 +133,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, (error) => handleFirestoreError(error, OperationType.GET, 'mainMaterials'));
 
     return () => {
-      unsubscribeLocations();
+      unsubscribeProfiles();
+      unsubscribeSubs();
       unsubscribeRequests();
       unsubscribeRap();
       unsubscribeNotifications();
@@ -139,21 +142,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  const updateRapData = async (locationId: string, newData: RAPItem[]) => {
+  const updateRapData = async (subId: string, newData: RAPItem[]) => {
     try {
-      // First, clear old rap data for this location as batch (simplified: delete then add)
-      const q = query(collection(db, `locations/${locationId}/rapData`));
+      const q = query(collection(db, `subs/${subId}/rapData`));
       const snapshot = await getDocs(q);
       const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
       await Promise.all(deletePromises);
 
       const addPromises = newData.map(item => {
         const { id, ...data } = item;
-        return addDoc(collection(db, `locations/${locationId}/rapData`), { ...data, locationId });
+        return addDoc(collection(db, `subs/${subId}/rapData`), { ...data, locationId: subId });
       });
       await Promise.all(addPromises);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `locations/${locationId}/rapData`);
+      handleFirestoreError(error, OperationType.WRITE, `subs/${subId}/rapData`);
     }
   };
 
@@ -173,30 +175,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  const addLocation = async (name: string) => {
+  const addProfile = async (name: string, avatarUrl?: string) => {
     try {
-      await addDoc(collection(db, 'locations'), { name });
-      addNotification(`Lokasi baru dibuat: ${name}`, 'SM', 'success');
+      await addDoc(collection(db, 'profiles'), { 
+        name, 
+        avatarUrl: avatarUrl || '', 
+        createdAt: Date.now() 
+      });
+      addNotification(`Profile baru dibuat: ${name}`, 'SM', 'success');
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'locations');
+      handleFirestoreError(error, OperationType.CREATE, 'profiles');
     }
   };
 
-  const updateLocation = async (id: string, name: string, imageUrl?: string) => {
+  const updateProfile = async (id: string, name: string, avatarUrl?: string) => {
     try {
-      await updateDoc(doc(db, 'locations', id), { name, imageUrl });
+      const updateData: any = { name };
+      if (avatarUrl) updateData.avatarUrl = avatarUrl;
+      await updateDoc(doc(db, 'profiles', id), updateData);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `locations/${id}`);
+      handleFirestoreError(error, OperationType.UPDATE, `profiles/${id}`);
     }
   };
 
-  const removeLocation = async (id: string) => {
+  const removeProfile = async (id: string) => {
     try {
-      const loc = locations.find(l => l.id === id);
-      await deleteDoc(doc(db, 'locations', id));
-      addNotification(`Lokasi ${loc?.name} dihapus`, 'SM', 'info');
+      const prof = profiles.find(p => p.id === id);
+      await deleteDoc(doc(db, 'profiles', id));
+      addNotification(`Profile ${prof?.name} dihapus`, 'SM', 'info');
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `locations/${id}`);
+      handleFirestoreError(error, OperationType.DELETE, `profiles/${id}`);
+    }
+  };
+
+  const addSub = async (name: string, profileId: string) => {
+    try {
+      await addDoc(collection(db, 'subs'), { 
+        name, 
+        profileId, 
+        createdAt: Date.now() 
+      });
+      addNotification(`Sub Lokasi baru dibuat: ${name}`, 'SM', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'subs');
+    }
+  };
+
+  const updateSub = async (id: string, name: string) => {
+    try {
+      await updateDoc(doc(db, 'subs', id), { name });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `subs/${id}`);
+    }
+  };
+
+  const removeSub = async (id: string) => {
+    try {
+      const sub = subs.find(s => s.id === id);
+      await deleteDoc(doc(db, 'subs', id));
+      addNotification(`Sub Lokasi ${sub?.name} dihapus`, 'SM', 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `subs/${id}`);
     }
   };
 
@@ -227,11 +266,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!req) return;
 
       if (req.status === 'pending') {
-        // Direct edit
         await updateDoc(doc(db, 'requests', requestId), data);
         addNotification(`Request ${req.materialName} telah diperbarui langsung`, 'SCM', 'update');
       } else {
-        // Request for edit (SCM must approve)
         await updateDoc(doc(db, 'requests', requestId), {
           pendingEdit: {
             materialName: data.materialName || req.materialName,
@@ -240,8 +277,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             dateNeeded: data.dateNeeded || req.dateNeeded
           }
         });
-        const locName = locations.find(l => l.id === req.locationId)?.name;
-        addNotification(`Permintaan Edit untuk ${req.materialName} (${locName})`, 'SCM', 'update', locName);
+        const targetSubId = data.subId || req.subId;
+        const sub = subs.find(s => s.id === targetSubId);
+        const subName = sub?.name;
+        addNotification(`Permintaan Edit untuk ${req.materialName} (${subName})`, 'SCM', 'update', subName);
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `requests/${requestId}`);
@@ -297,12 +336,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     try {
       const docRef = await addDoc(collection(db, 'requests'), newRequestData);
-      const locName = locations.find(l => l.id === reqData.locationId)?.name;
-      addNotification(`Request baru untuk ${newRequestData.materialName} dari ${locName}`, 'SCM', 'info', locName);
+      const subName = subs.find(s => s.id === reqData.subId)?.name;
+      addNotification(`Request baru untuk ${newRequestData.materialName} dari ${subName}`, 'SCM', 'info', subName);
       
-      // Sync to Sheets
       if (accessToken) {
-        syncToSheets({ ...newRequestData, id: docRef.id } as MaterialRequest, locName || 'Unknown');
+        syncToSheets({ ...newRequestData, id: docRef.id } as MaterialRequest, subName || 'Unknown');
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'requests');
@@ -332,32 +370,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const syncDirectToSheet = async (req: MaterialRequest, locName: string) => {
-    const sheetUrl = import.meta.env.VITE_GOOGLE_SHEETS_URL;
-    if (!sheetUrl) return;
-
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxBOB9bwNHK033vpgxQsU30Tnczn2l0s5OmsembojVKq6G_0qE_bo91BP4sWk2tB8g/exec";
+    
+    const payload = {
+      lokasi: locName,
+      tanggal_request: req.createdAt ? new Date(req.createdAt).toLocaleDateString("id-ID") : (req.dateRequested || "-"),
+      nama_barang: req.materialName,
+      jumlah: req.quantity,
+      satuan: req.unit.toUpperCase(),
+      tanggal_diperlukan: new Date(req.dateNeeded).toLocaleDateString("id-ID"),
+      tanggal_diterima: new Date().toLocaleDateString("id-ID"),
+      penerima: req.recipient || "-",
+      pengantar: req.deliverer || "-"
+    };
+    
     try {
-      await fetch(sheetUrl, {
-        method: 'POST',
-        mode: 'no-cors',
+      await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "text/plain",
         },
-        body: JSON.stringify({
-          id: req.id,
-          locationName: locName,
-          materialName: req.materialName,
-          quantity: req.quantity,
-          unit: req.unit.toUpperCase(),
-          dateRequested: req.createdAt ? new Date(req.createdAt).toLocaleDateString('id-ID') : (req.dateRequested || '-'),
-          dateNeeded: new Date(req.dateNeeded).toLocaleDateString('id-ID'),
-          dateReceived: new Date().toLocaleDateString('id-ID'),
-          recipient: req.recipient || '-',
-          deliverer: req.deliverer || '-',
-          status: 'Done'
-        }),
+        body: JSON.stringify(payload)
       });
-    } catch (err) {
-      console.error('Direct Sheet sync failed:', err);
+      console.log("Sinkronisasi otomatis berhasil dikirim untuk:", req.materialName);
+    } catch (error) {
+      console.error("Gagal sinkronisasi:", error);
     }
   };
 
@@ -366,11 +404,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const currentReq = requests.find(r => r.id === requestId);
       if (!currentReq || currentReq.status === newStatus) return;
 
-      const loc = locations.find(l => l.id === currentReq.locationId);
-      const locName = loc?.name;
+      const sub = subs.find(s => s.id === currentReq.subId);
+      const subName = sub?.name;
 
       await runTransaction(db, async (transaction) => {
-        // 1. MUST Read document in transaction before writing
         const reqRef = doc(db, 'requests', requestId);
         const reqDoc = await transaction.get(reqRef);
         
@@ -379,42 +416,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         const reqData = reqDoc.data() as MaterialRequest;
-        
-        // 2. Prepare update data
         const updatedHistory = [...(reqData.history || []), { status: newStatus, timestamp: Date.now() }];
         const updateData: any = {
           status: newStatus,
           history: updatedHistory,
+          ...(newStatus === 'received' ? { receivedAt: Date.now() } : {}),
           ...(extraData?.recipient ? { recipient: extraData.recipient } : {}),
           ...(extraData?.deliverer ? { deliverer: extraData.deliverer } : {})
         };
 
-        // 3. Perform update
         transaction.update(reqRef, updateData);
-
-        // 4. Update stock if received
-        if (newStatus === 'received' && reqData.status !== 'received') {
-          // If we are receiving, we need to check stock. 
-          // Note: Queries in standard Firestore Transactions are tricky; 
-          // usually better to have a single stock doc per material or use a known ID.
-          // Since we already did getDocs outside earlier, we'll try to find it again inside if possible, 
-          // or just use setDoc with a deterministic ID if we want truly atomic.
-          // For now, we'll keep the logic but ensure we follow transaction rules.
-          
-          const addedQty = reqData.quantity; // Added full quantity (removed the * 0.5 test logic)
-          
-          // Since we can't easily query inside a transaction without knowing the ID, 
-          // let's use a deterministic ID for material-location stock if possible, 
-          // or just fallback to the outside read reference for now as it's better than before.
-          // BUT: transaction.get(query) is not valid.
-          // We'll stick to updating the request first.
-        }
       });
 
-      // Stock logic refinement: move it to separate call or handle after transaction if purely additive
       if (newStatus === 'received' && currentReq.status !== 'received') {
         const q = query(
-          collection(db, `locations/${currentReq.locationId}/stock`), 
+          collection(db, `subs/${currentReq.subId}/stock`), 
           where('materialName', '==', currentReq.materialName)
         );
         const stockSnapshot = await getDocs(q);
@@ -425,17 +441,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             dateReceived: Date.now()
           });
         } else {
-          await addDoc(collection(db, `locations/${currentReq.locationId}/stock`), {
+          await addDoc(collection(db, `subs/${currentReq.subId}/stock`), {
             materialName: currentReq.materialName,
             quantity: currentReq.quantity,
             unit: currentReq.unit,
             dateReceived: Date.now(),
-            locationName: locName
+            subId: currentReq.subId
           });
         }
       }
 
-      // Notification Logic
       const statusLabels: Record<RequestStatus, string> = {
         pending: 'Belum di proses',
         processing: 'Diproses',
@@ -447,18 +462,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       if (newStatus === 'awaiting_payment') {
-        addNotification(`Request ${currentReq.materialName} menunggu pembayaran (${locName})`, 'FINANCE', 'info', locName);
+        addNotification(`Request ${currentReq.materialName} menunggu pembayaran (${subName})`, 'FINANCE', 'info', subName);
       }
-      addNotification(`Material ${currentReq.materialName}: ${statusLabels[newStatus]}`, 'SM', 'update', locName);
+      addNotification(`Material ${currentReq.materialName}: ${statusLabels[newStatus]}`, 'SM', 'update', subName);
 
-      // Sync update to Sheets
       if (accessToken) {
-        syncToSheets({ ...currentReq, status: newStatus, ...(extraData || {}) } as MaterialRequest, locName || 'Unknown');
+        syncToSheets({ ...currentReq, status: newStatus, ...(extraData || {}) } as MaterialRequest, subName || 'Unknown');
       }
 
-      // Sync DIRECT to Sheet if received
       if (newStatus === 'received') {
-        syncDirectToSheet({ ...currentReq, status: newStatus, ...(extraData || {}) } as MaterialRequest, locName || 'Unknown');
+        syncDirectToSheet({ ...currentReq, status: newStatus, ...(extraData || {}) } as MaterialRequest, subName || 'Unknown');
       }
 
     } catch (error) {
@@ -466,11 +479,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateStock = async (locationId: string, stockId: string, newQuantity: number) => {
+  const updateStock = async (subId: string, stockId: string, newQuantity: number) => {
     try {
-      await updateDoc(doc(db, `locations/${locationId}/stock`, stockId), { quantity: newQuantity });
+      await updateDoc(doc(db, `subs/${subId}/stock`, stockId), { quantity: newQuantity });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `locations/${locationId}/stock/${stockId}`);
+      handleFirestoreError(error, OperationType.UPDATE, `subs/${subId}/stock/${stockId}`);
     }
   };
 
@@ -495,12 +508,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      locations,
+      profiles,
+      subs,
       requests,
       notifications,
-      addLocation,
-      updateLocation,
-      removeLocation,
+      addProfile,
+      updateProfile,
+      removeProfile,
+      addSub,
+      updateSub,
+      removeSub,
       addMainMaterial,
       deleteMainMaterial,
       addRequest,
@@ -514,14 +531,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rapData,
       setRapData: updateRapData,
       updateStock,
+      mainMaterials,
       accessToken,
-      setAccessToken
+      setAccessToken,
+      syncDirectToSheet
     }}>
       {children}
     </AppContext.Provider>
   );
 };
-
 
 export const useApp = () => {
   const context = useContext(AppContext);

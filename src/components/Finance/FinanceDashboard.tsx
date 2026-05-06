@@ -5,18 +5,18 @@ import { CreditCard, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
 import { RequestStatus, MaterialRequest } from '../../types';
 
 export default function FinanceDashboard() {
-  const { locations = [], requests = [], updateRequestStatus } = useApp();
+  const { profiles = [], subs = [], requests = [], updateRequestStatus } = useApp();
 
   // Finance only cares about requests that are 'awaiting_payment' or 'paid'
   const relevantRequests = requests.filter(r => r.status === 'awaiting_payment' || r.status === 'paid');
 
-  const locationsWithRequests = locations.map(loc => ({
-    ...loc,
-    requests: relevantRequests.filter(r => r.locationId === loc.id)
-  })).filter(loc => loc.requests.length > 0);
+  const subsWithRequests = subs.map(sub => ({
+    ...sub,
+    requests: relevantRequests.filter(r => r.subId === sub.id)
+  })).filter(sub => sub.requests.length > 0);
 
-  // For debugging/safety: find requests that don't match any location
-  const orphanedRequests = relevantRequests.filter(r => !locations.some(l => l.id === r.locationId));
+  // For debugging/safety: find requests that don't match any sub
+  const orphanedRequests = relevantRequests.filter(r => !subs.some(s => s.id === r.subId));
 
   return (
     <div className="relative h-full flex flex-col bg-bg-base">
@@ -45,7 +45,7 @@ export default function FinanceDashboard() {
           </div>
         </header>
 
-        {locationsWithRequests.length === 0 && orphanedRequests.length === 0 ? (
+        {subsWithRequests.length === 0 && orphanedRequests.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
             <div className="w-24 h-24 rounded-full border border-border-ig flex items-center justify-center mb-6 opacity-30">
                <CheckCircle2 size={48} strokeWidth={1} />
@@ -56,31 +56,36 @@ export default function FinanceDashboard() {
         ) : (
           <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4 space-y-8">
             <div className="space-y-6">
-              {locationsWithRequests.map((loc, idx) => (
-                <motion.div 
-                   key={loc.id}
-                   initial={{ opacity: 0, y: 10 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   transition={{ delay: idx * 0.1 }}
-                   className="space-y-4"
-                >
-                  <div className="flex items-center justify-between px-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-ig-blue" />
-                      <h3 className="text-sm font-bold tracking-tight">{loc.name}</h3>
+              {subsWithRequests.map((sub, idx) => {
+                const profile = profiles.find(p => p.id === sub.profileId);
+                return (
+                  <motion.div 
+                    key={sub.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="space-y-4"
+                  >
+                    <div className="flex items-center justify-between px-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-ig-blue" />
+                        <h3 className="text-sm font-bold tracking-tight">
+                          {profile?.name} - {sub.name}
+                        </h3>
+                      </div>
+                      <span className="text-[10px] font-bold text-ig-grey uppercase">
+                        {sub.requests.filter(r => r.status === 'awaiting_payment').length} Pending
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold text-ig-grey uppercase">
-                      {loc.requests.filter(r => r.status === 'awaiting_payment').length} Pending
-                    </span>
-                  </div>
 
-                  <div className="space-y-4">
-                    {loc.requests.map(req => (
-                      <FinanceRequestItem key={req.id} request={req} onApprove={updateRequestStatus} />
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="space-y-4">
+                      {sub.requests.map(req => (
+                        <FinanceRequestItem key={req.id} request={req} onApprove={updateRequestStatus} />
+                      ))}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
 
             {orphanedRequests.length > 0 && (

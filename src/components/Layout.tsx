@@ -79,8 +79,7 @@ export default function Layout() {
               className="w-full max-w-[350px] flex flex-col items-center"
             >
               <div className="mb-12 flex flex-col items-center">
-                <h1 className="text-4xl font-light tracking-tight mb-2 italic">Logistics</h1>
-                <p className="text-ig-grey text-[10px] font-bold uppercase tracking-[0.3em] text-center opacity-40">System Access Matrix</p>
+                <h1 className="text-4xl font-light tracking-tight mb-2 italic">Renovki Dashboard</h1>
               </div>
 
               <div className="w-full space-y-3">
@@ -130,10 +129,8 @@ export default function Layout() {
             {/* Desktop Sidebar (Instagram Web Style) */}
             <nav className="hidden lg:flex w-[240px] border-r border-border-ig flex-col p-6 h-full shrink-0">
               <div className="mb-10 px-3 flex flex-col">
-                <h1 className="text-2xl font-light tracking-tight italic leading-tight">Logistics</h1>
-                <p className="text-[10px] font-bold text-ig-blue uppercase tracking-[0.2em]">
-                  {role === 'SM' ? 'Site Manager' : role === 'SCM' ? 'Supply Chain' : 'Finance'}
-                </p>
+                <h1 className="text-2xl font-light tracking-tight italic leading-tight">Renovki</h1>
+                <p className="text-[10px] font-bold text-ig-blue uppercase tracking-[0.2em]">Dashboard</p>
               </div>
 
               <div className="flex-1 space-y-2">

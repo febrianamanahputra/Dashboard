@@ -1,18 +1,40 @@
 /**
- * GOOGLE APPS SCRIPT: WEB APP RECEIVER (VERSION 2)
- * Hubungkan data dari Web App langsung ke Spreadsheet per Lokasi
+ * GOOGLE APPS SCRIPT: WEB APP RECEIVER (VERSION 3 - FINAL)
+ * Mendukung Sinkronisasi Realtime per Lokasi dari Web App.
+ * 
+ * Petunjuk:
+ * 1. Tempel di Extensions > Apps Script.
+ * 2. Deploy > New Deployment > Web App.
+ * 3. Set "Who has access" ke "Anyone".
+ * 4. Klik Deploy dan salin URL-nya.
  */
+
+function doGet(e) {
+  return handleRequest(e.parameter);
+}
 
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
+    return handleRequest(data);
+  } catch (err) {
+    // Jika JSON gagal, coba ambil dari parameter
+    return handleRequest(e.parameter);
+  }
+}
+
+function handleRequest(data) {
+  try {
+    if (!data || Object.keys(data).length === 0) {
+      return createResponse({"result": "error", "message": "No data received"});
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    
-    // Gunakan nama lokasi sebagai nama sheet (misal: "Proyek A")
-    var sheetName = data.locationName || "Umum";
+    // Gunakan 'lokasi' dari payload sebagai nama sheet
+    var sheetName = data.lokasi || "Umum";
     var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
     
-    // Setup Header jika sheet baru/kosong
+    // Header sesuai permintaan Anda
     if (sheet.getLastRow() === 0) {
       sheet.appendRow([
         "No", 
@@ -29,27 +51,31 @@ function doPost(e) {
       sheet.getRange(1, 1, 1, 10).setFontWeight("bold").setBackground("#f3f3f3");
     }
     
-    var nextNo = sheet.getLastRow(); // Anggap baris 1 adalah header
+    var nextNo = sheet.getLastRow();
     
-    // Tambahkan data ke baris baru
+    // Mapping data dari payload kirimKeDone
     sheet.appendRow([
       nextNo,
-      data.dateRequested,
-      data.materialName,
-      data.quantity,
-      data.unit,
-      data.dateNeeded,
-      data.dateReceived,
-      data.recipient || "-",
-      data.deliverer || "-",
+      data.tanggal_request || "-",
+      data.nama_barang || "-",
+      data.jumlah || 0,
+      data.satuan || "-",
+      data.tanggal_diperlukan || "-",
+      data.tanggal_diterima || new Date().toLocaleDateString('id-ID'),
+      data.penerima || "-",
+      data.pengantar || "-",
       "Done"
     ]);
     
-    return ContentService.createTextOutput(JSON.stringify({"result": "success"}))
-      .setMimeType(ContentService.MimeType.JSON);
+    return createResponse({"result": "success", "sheet": sheetName});
       
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({"result": "error", "error": err.toString()}))
-      .setMimeType(ContentService.MimeType.JSON);
+    return createResponse({"result": "error", "error": err.toString()});
   }
 }
+
+function createResponse(output) {
+  return ContentService.createTextOutput(JSON.stringify(output))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
