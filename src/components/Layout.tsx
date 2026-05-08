@@ -66,7 +66,7 @@ export default function Layout() {
   }, [showNotifications, role, notifications.length]);
 
   return (
-    <div className="min-h-screen bg-bg-base font-sans text-ig-black flex flex-col lg:flex-row h-screen overflow-hidden">
+    <div className="min-h-screen bg-bg-base font-sans text-ig-black flex flex-col lg:flex-row h-[100dvh] overflow-hidden">
       
       <AnimatePresence mode="popLayout">
         {role === null ? (
@@ -118,7 +118,7 @@ export default function Layout() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex-1 flex flex-col lg:flex-row h-screen overflow-hidden"
+            className="flex-1 flex flex-col lg:flex-row h-[100dvh] overflow-hidden"
           >
             {/* Desktop Sidebar (Instagram Web Style) */}
             <nav className="hidden lg:flex w-[240px] border-r border-border-ig flex-col p-6 h-full shrink-0">
@@ -196,8 +196,8 @@ export default function Layout() {
                 </div>
               </main>
 
-              {/* Mobile Bottom Navigation (Instagram Style) */}
-              {role !== 'SM' && (
+              {/* Mobile Bottom Navigation (Instagram Style) - Only for SCM as others have their own */}
+              {(role === 'SCM') && (
                 <footer className="lg:hidden h-[50px] border-t border-border-ig flex items-center justify-around bg-bg-base shrink-0">
                   <button onClick={() => setShowNotifications(false)} className="p-2">
                     <Globe size={24} className={!showNotifications ? 'text-ig-black' : 'text-ig-grey'} />

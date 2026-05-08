@@ -251,7 +251,7 @@ export default function SMDashboard() {
         </div>
       )}
 
-      <section className="flex-1 flex flex-col overflow-hidden bg-bg-alt pb-[70px]">
+      <section className="flex-1 flex flex-col overflow-hidden bg-bg-alt pb-[75px] md:pb-[70px] safe-area-pb">
         <AnimatePresence mode="wait">
           {activeView === 'reports' && (
             <motion.div 
@@ -561,7 +561,7 @@ export default function SMDashboard() {
       </section>
 
       {/* Bottom Navigation Bar */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border-ig px-6 py-3 flex items-center justify-between z-[100] shadow-[0_-4px_10px_rgba(0,0,0,0.03)] h-[70px]">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border-ig px-2 py-3 flex items-center justify-around z-[100] shadow-[0_-4px_20px_rgba(0,0,0,0.05)] h-[85px] md:h-[70px] safe-area-pb">
         <NavButton 
           active={activeView === 'reports'} 
           onClick={() => setActiveView('reports')} 

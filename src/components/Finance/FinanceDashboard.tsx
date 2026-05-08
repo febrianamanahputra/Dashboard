@@ -166,7 +166,7 @@ export default function FinanceDashboard() {
       </div>
 
       {/* Bottom Nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border-ig px-6 py-4 flex items-center justify-around z-50 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-border-ig px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] flex items-center justify-around z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] safe-area-pb">
         <button 
           onClick={() => { setActiveTab('requests'); setSelectedSubId(null); }}
           className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'requests' ? 'text-ig-blue scale-110' : 'text-ig-grey opacity-40'}`}
