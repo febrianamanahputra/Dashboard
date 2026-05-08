@@ -105,26 +105,32 @@
       "required": ["name", "unit"]
     },
     "FieldFundEntry": {
-      "title": "Field Fund Entry",
-      "description": "Financial record for field expenditures and petty cash.",
+      "title": "Field Fund Entry (Nota)",
+      "description": "Financial record for field expenditures grouped by invoice (Nota).",
       "type": "object",
       "properties": {
         "subId": { "type": "string" },
         "tanggal": { "type": "string", "format": "date" },
-        "uraian": { "type": "string" },
-        "adaTidakAda": { "type": "string", "enum": ["ADA", "TIDAK ADA"] },
-        "klasifikasi": { "type": "string" },
-        "kategori": { "type": "string" },
-        "masuk": { "type": "number" },
-        "keluarVol": { "type": "number" },
-        "keluarSatuan": { "type": "string" },
-        "keluarHargaSatuan": { "type": "number" },
-        "keluarTotal": { "type": "number" },
-        "saldo": { "type": "number" },
+        "notaNo": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "uraian": { "type": "string" },
+              "klasifikasi": { "type": "string", "enum": ["BAHAN", "ALAT", "JASA"] },
+              "jumlah": { "type": "number" },
+              "satuan": { "type": "string" },
+              "hargaSatuan": { "type": "number" },
+              "hargaTotal": { "type": "number" }
+            }
+          }
+        },
+        "totalNota": { "type": "number" },
         "keterangan": { "type": "string" },
         "createdAt": { "type": "number" }
       },
-      "required": ["subId", "tanggal", "uraian", "adaTidakAda", "klasifikasi", "kategori", "masuk", "keluarVol", "keluarSatuan", "keluarHargaSatuan", "keluarTotal", "saldo", "keterangan", "createdAt"]
+      "required": ["subId", "tanggal", "notaNo", "items", "totalNota", "createdAt"]
     },
     "ReportTemplate": {
       "title": "Report Template",

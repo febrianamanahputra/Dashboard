@@ -86,20 +86,22 @@ export interface Notification {
   locationName?: string;
 }
 
+export interface FieldFundItem {
+  uraian: string;
+  klasifikasi: 'BAHAN' | 'ALAT' | 'JASA';
+  jumlah: number;
+  satuan: string;
+  hargaSatuan: number;
+  hargaTotal: number;
+}
+
 export interface FieldFundEntry {
   id: string;
   subId: string;
   tanggal: string;
-  uraian: string;
-  adaTidakAda: 'ADA' | 'TIDAK ADA';
-  klasifikasi: string;
-  kategori: string;
-  masuk: number;
-  keluarVol: number;
-  keluarSatuan: string;
-  keluarHargaSatuan: number;
-  keluarTotal: number;
-  saldo: number;
+  notaNo: string;
+  items: FieldFundItem[];
+  totalNota: number;
   keterangan: string;
   createdAt: number;
 }

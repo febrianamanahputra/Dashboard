@@ -523,7 +523,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...entry,
         createdAt: Date.now()
       });
-      addNotification(`Dana Lapangan baru diinput: ${entry.uraian}`, 'FINANCE', 'info');
+      addNotification(`Dana Lapangan baru diinput: ${entry.notaNo}`, 'FINANCE', 'info');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'fieldFunds');
     }

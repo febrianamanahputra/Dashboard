@@ -281,27 +281,28 @@ export default function SMDashboard() {
           <div className="flex-1 flex flex-col h-full overflow-hidden">
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               <div className="px-4 py-3 bg-bg-base flex items-center justify-between border-b border-border-ig">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center p-1 bg-gradient-to-r from-[#25D366]/20 to-[#128C7E]/10 rounded-xl gap-1">
                    <button 
                     onClick={() => setView('rap')}
-                    className="p-2 text-ig-blue hover:bg-ig-blue/5 rounded-full transition-colors flex items-center gap-2"
+                    className="p-2 text-ig-blue hover:bg-white/50 rounded-lg transition-colors flex items-center justify-center"
+                    title="Budget RAP"
                    >
-                      <FileSpreadsheet size={18} strokeWidth={2} />
-                      <span className="text-[10px] font-bold uppercase tracking-widest">Budget RAP</span>
+                      <FileSpreadsheet size={22} strokeWidth={2} />
                    </button>
+                   <div className="w-[1px] h-6 bg-ig-black/10 mx-1" />
+                   <button 
+                    onClick={() => activeSubId && setShowAddForm(true)}
+                    disabled={!activeSubId}
+                    className={`p-2 rounded-lg transition-all ${
+                      !activeSubId 
+                      ? 'opacity-20 cursor-not-allowed text-ig-grey' 
+                      : 'text-ig-black hover:bg-white/50'
+                    }`}
+                    title="Request Material"
+                  >
+                    <PlusSquare size={24} />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => activeSubId && setShowAddForm(true)}
-                  disabled={!activeSubId}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
-                    !activeSubId 
-                    ? 'opacity-20 cursor-not-allowed text-ig-grey' 
-                    : 'bg-ig-black text-white hover:bg-ig-black/90 active:scale-95 shadow-sm'
-                  }`}
-                >
-                  <PlusSquare size={16} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Request Material</span>
-                </button>
               </div>
 
               {/* Tabs Section Only inside Requests */}
@@ -798,12 +799,28 @@ function ReportView({
   draftRows?: string[];
   onDraftChange: (rows: string[]) => void;
 }) {
-  const { reportTemplates = [], updateReportTemplate } = useApp();
+  const { reportTemplates = [], updateReportTemplate, profiles = [], subs = [], activeProfileId } = useApp();
   const [showSettings, setShowSettings] = useState(false);
   const template = reportTemplates.find(t => t.subId === subId) || { heading: '', footer: '' };
 
+  const activeProfile = profiles.find(p => p.id === activeProfileId);
+  const activeSub = subs.find(s => s.id === subId);
+
   // Local effect to handle rows state through parent
   const rows = draftRows || ['', '', '', '', ''];
+
+  const getIndonesianDate = () => {
+    const now = new Date();
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    
+    const dayName = days[now.getDay()];
+    const date = now.getDate();
+    const monthName = months[now.getMonth()];
+    const year = now.getFullYear();
+    
+    return `${dayName}, ${date} ${monthName} ${year}`;
+  };
 
   const updateRow = (index: number, value: string) => {
     const newRows = [...rows];
@@ -834,15 +851,29 @@ function ReportView({
       return;
     }
 
+    const hour = new Date().getHours();
+    const isAfternoon = hour >= 13;
+    const separator = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+    const locationName = activeProfile ? activeProfile.name : 'Project';
+    const targetLocation = locationName;
+    const dateStr = getIndonesianDate();
+
     let message = '';
     if (mode === 'full') {
-      const validLines = rows.filter(r => r.trim()).map(r => `Pek. ${r.trim()}`);
+      const validLines = rows.filter(r => r.trim()).map(r => 
+        isAfternoon ? `> Pek. ${r.trim()}` : `- Pek. ${r.trim()}`
+      );
       if (validLines.length === 0) return alert('Input laporan terlebih dahulu');
-      message = `${template.heading}\n\n${validLines.join('\n')}\n\n${template.footer}`;
+      
+      if (isAfternoon) {
+        message = `*Bismillah,*\n*Progress Project ${targetLocation}*\n\n\`${dateStr}\`\n${separator}\n${validLines.join('\n')}\n${separator}\nTerima kasih`;
+      } else {
+        message = `Bismillah, Selamat Pagi Bapak/ibu\nRencana Kerja ${targetLocation}\n\n${dateStr}\n${separator}\n${validLines.join('\n')}\n${separator}\nTerima kasih`;
+      }
     } else if (lineIndex !== undefined) {
       const lineText = rows[lineIndex].trim();
       if (!lineText) return;
-      message = `Pek. ${lineText}`;
+      message = isAfternoon ? `> Pek. ${lineText}` : `- Pek. ${lineText}`;
     }
 
     const encodedMessage = encodeURIComponent(message);
@@ -852,21 +883,9 @@ function ReportView({
   return (
     <div className="flex-1 flex flex-col h-full bg-bg-base overflow-hidden">
       <div className="px-5 py-4 border-b border-border-ig flex items-center justify-between bg-bg-base sticky top-0 z-10 shadow-sm text-left">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-ig-blue/10 flex items-center justify-center text-ig-blue">
-            <ClipboardList size={22} />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold tracking-tight">Ketik Report Harian</h2>
-            <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest leading-none">Format WhatsApp Pek.</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-bold tracking-tight">Report Harian</h2>
         </div>
-        <button 
-          onClick={() => setShowSettings(!showSettings)}
-          className={`p-2.5 text-ig-grey hover:bg-bg-alt rounded-full transition-colors ${showSettings ? 'bg-ig-black text-white' : ''}`}
-        >
-          <Settings size={20} />
-        </button>
       </div>
 
       <div className="flex-1 p-4 overflow-y-auto custom-scrollbar pb-32">
@@ -875,9 +894,9 @@ function ReportView({
              <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Detail Pekerjaan (Caption)</label>
              <button 
               onClick={addRow}
-              className="text-ig-blue text-[10px] font-bold uppercase flex items-center gap-1 hover:opacity-70 transition-opacity"
+              className="text-ig-blue text-[10px] font-bold uppercase tracking-widest hover:opacity-70 transition-opacity"
              >
-               <Plus size={14} /> Tambah Baris
+               Tambah Baris
              </button>
           </div>
 
@@ -895,12 +914,9 @@ function ReportView({
                      </div>
                   </div>
 
-                  <div className="bg-white/40 backdrop-blur-sm px-2 py-2.5 border-r border-border-ig flex items-center justify-center min-w-[32px] z-10">
-                    <span className="text-[9px] font-bold text-ig-grey">{idx + 1}</span>
-                  </div>
                   <input 
                     type="text"
-                    className="flex-1 px-3 py-2 text-xs font-bold outline-none bg-transparent placeholder:italic placeholder:opacity-50 z-10"
+                    className="flex-1 px-4 py-3 text-xs font-bold outline-none bg-transparent placeholder:italic placeholder:opacity-50 z-10"
                     placeholder="Input detail pekerjaan..."
                     value={row}
                     onChange={(e) => updateRow(idx, e.target.value)}
@@ -916,8 +932,8 @@ function ReportView({
                 </div>
 
                 <button 
-                  onClick={() => removeRow(idx)}
-                  className="p-2 text-ig-grey hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                   onClick={() => removeRow(idx)}
+                   className="p-2 text-ig-grey hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -925,14 +941,17 @@ function ReportView({
             ))}
           </div>
 
-          <div className="pt-4">
+          <div className="pt-6">
             <button 
               onClick={() => handleSendWA('full')}
-              className="w-full bg-ig-black text-white h-12 rounded-xl flex items-center justify-center gap-2 transition-all hover:bg-ig-black/95 active:scale-[0.98] shadow-lg shadow-black/10"
+              className="w-full bg-[#25D366] text-white py-4 rounded-none flex items-center justify-center gap-3 transition-all hover:opacity-95 active:scale-[0.98] shadow-lg shadow-green-500/10"
             >
-              <FileText size={18} />
-              <span className="text-[11px] font-bold uppercase tracking-widest">Kirim Full Report WhatsApp</span>
+              <Send size={18} />
+              <span className="text-[11px] font-bold uppercase tracking-widest">Kirim Report WhatsApp</span>
             </button>
+            <div className="mt-4 opacity-50 text-center">
+              <p className="text-[9px] font-bold text-ig-grey uppercase tracking-widest">Templating Otomatis Berdasarkan Waktu</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1584,51 +1603,61 @@ function FundsView({ subId }: { subId: string }) {
             <table className="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm border border-border-ig">
               <thead>
                 <tr className="bg-bg-alt text-[9px] font-bold text-ig-grey uppercase tracking-widest text-left">
-                  <th className="p-3 border-b border-border-ig">NO</th>
+                  <th className="p-3 border-b border-border-ig">NO NOTA</th>
                   <th className="p-3 border-b border-border-ig">TANGGAL</th>
-                  <th className="p-3 border-b border-border-ig">URAIAN</th>
-                  <th className="p-3 border-b border-border-ig">ADA/TIDAK</th>
+                  <th className="p-3 border-b border-border-ig">ITEM PEMBELIAN</th>
                   <th className="p-3 border-b border-border-ig">KLASIFIKASI</th>
-                  <th className="p-3 border-b border-border-ig">KATEGORI</th>
-                  <th className="p-3 border-b border-border-ig">MASUK</th>
-                  <th className="p-3 border-b border-border-ig">VOL</th>
+                  <th className="p-3 border-b border-border-ig">QTY</th>
                   <th className="p-3 border-b border-border-ig">SAT</th>
-                  <th className="p-3 border-b border-border-ig">HARGA</th>
-                  <th className="p-3 border-b border-border-ig">KELUAR (TOTAL)</th>
-                  <th className="p-3 border-b border-border-ig">SALDO</th>
-                  <th className="p-3 border-b border-border-ig">KETERANGAN</th>
+                  <th className="p-3 border-b border-border-ig">HARGA SATUAN</th>
+                  <th className="p-3 border-b border-border-ig">TOTAL</th>
+                  <th className="p-3 border-b border-border-ig">TOTAL NOTA</th>
                   <th className="p-3 border-b border-border-ig">AKSI</th>
                 </tr>
               </thead>
               <tbody className="text-[11px] font-medium text-ig-black divide-y divide-gray-50 text-left">
-                {subFunds.map((fund, idx) => (
-                  <tr key={fund.id} className="hover:bg-bg-alt/30 transition-colors">
-                    <td className="p-3">{idx + 1}</td>
-                    <td className="p-3 font-bold">{fund.tanggal}</td>
-                    <td className="p-3 max-w-[200px] truncate">{fund.uraian}</td>
-                    <td className="p-3">
-                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${fund.adaTidakAda === 'ADA' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-500 border border-red-100'}`}>
-                        {fund.adaTidakAda}
-                      </span>
-                    </td>
-                    <td className="p-3">{fund.klasifikasi}</td>
-                    <td className="p-3">{fund.kategori}</td>
-                    <td className="p-3 text-green-600 font-bold">{(fund.masuk || 0).toLocaleString()}</td>
-                    <td className="p-3">{fund.keluarVol}</td>
-                    <td className="p-3">{fund.keluarSatuan}</td>
-                    <td className="p-3">{(fund.keluarHargaSatuan || 0).toLocaleString()}</td>
-                    <td className="p-3 text-red-500 font-bold">{(fund.keluarTotal || 0).toLocaleString()}</td>
-                    <td className="p-3 font-black italic">{(fund.saldo || 0).toLocaleString()}</td>
-                    <td className="p-3 italic text-ig-grey truncate max-w-[150px]">{fund.keterangan}</td>
-                    <td className="p-3">
-                      <button 
-                        onClick={() => deleteFieldFundEntry(fund.id)}
-                        className="p-1.5 text-red-300 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
+                {subFunds.map((nota) => (
+                  <React.Fragment key={nota.id}>
+                    {(nota.items || []).map((item: any, idx: number) => (
+                      <tr key={`${nota.id}-${idx}`} className="hover:bg-bg-alt/30 transition-colors">
+                        {idx === 0 && (
+                          <td rowSpan={nota.items.length} className="p-3 font-bold border-r border-border-ig bg-bg-alt/10 align-top">
+                            {nota.notaNo}
+                          </td>
+                        )}
+                        {idx === 0 && (
+                          <td rowSpan={nota.items.length} className="p-3 font-bold border-r border-border-ig align-top">
+                            {nota.tanggal}
+                          </td>
+                        )}
+                        <td className="p-3 max-w-[200px] truncate font-bold">{item.uraian}</td>
+                        <td className="p-3">
+                          <span className="px-1.5 py-0.5 rounded-[4px] bg-ig-black/5 text-[8px] font-black uppercase">
+                            {item.klasifikasi || 'BAHAN'}
+                          </span>
+                        </td>
+                        <td className="p-3">{item.jumlah}</td>
+                        <td className="p-3">{item.satuan}</td>
+                        <td className="p-3">{(item.hargaSatuan || 0).toLocaleString()}</td>
+                        <td className="p-3 font-bold">{(item.hargaTotal || 0).toLocaleString()}</td>
+                        {idx === 0 && (
+                          <td rowSpan={nota.items.length} className="p-3 text-ig-blue font-black bg-ig-blue/5 text-sm border-l border-border-ig align-top">
+                            {(nota.totalNota || 0).toLocaleString()}
+                          </td>
+                        )}
+                        {idx === 0 && (
+                          <td rowSpan={nota.items.length} className="p-3 border-l border-border-ig align-top">
+                            <button 
+                              onClick={() => deleteFieldFundEntry(nota.id)}
+                              className="p-1.5 text-red-300 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -1662,14 +1691,8 @@ function ProfileManagementView({
 }: any) {
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-bg-alt overflow-hidden">
-      <div className="p-6 bg-white border-b border-border-ig sticky top-0 z-10 shadow-sm text-left">
-        <h2 className="text-lg font-bold tracking-tight">Manajemen Lokasi</h2>
-        <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest mt-1">Kelola Akun & Area Proyek</p>
-      </div>
-
+    <div className="flex-1 flex flex-col h-full bg-bg-alt overflow-hidden pt-4">
       <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-24 text-left">
-        <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest mb-6 px-1">Daftar Akun Utama / Lokasi</h3>
         <div className="grid grid-cols-3 gap-6">
           <button 
             onClick={() => setShowAddProfile(true)}
@@ -1708,24 +1731,19 @@ function ProfileManagementView({
         </div>
 
         {activeProfileId && (
-          <div className="mt-12 bg-white p-6 rounded-[32px] border border-border-ig shadow-xl shadow-black/5">
-             <div className="flex items-center justify-between mb-8">
-                <div>
-                   <h4 className="text-base font-bold">Opsi Pengaturan</h4>
-                   <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest mt-0.5">Edit atau Hapus Profile Aktif</p>
-                </div>
-                <button 
-                  onClick={() => setShowEditProfile(true)}
-                  className="bg-ig-black text-white px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-opacity"
-                >
-                  Edit Unit
-                </button>
-             </div>
-             
-             <div className="p-4 bg-bg-alt rounded-2xl flex items-center gap-4 text-xs font-bold italic text-ig-grey">
-                <AlertTriangle size={16} />
-                <span>Pilih profile di atas untuk menjadikannya aktif di dashboard utama.</span>
-             </div>
+          <div className="mt-8 flex flex-col items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-white border border-border-ig flex items-center justify-center text-ig-grey">
+                <Settings size={20} />
+              </div>
+              <button 
+                onClick={() => setShowEditProfile(true)}
+                className="bg-ig-black text-white w-12 h-12 rounded-full flex items-center justify-center hover:opacity-90 transition-opacity shadow-lg"
+                title="Edit Profil"
+              >
+                <Edit2 size={20} />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1737,174 +1755,214 @@ function FundEntryModal({ subId, onClose, onSubmit }: any) {
   const [form, setForm] = useState({
     subId,
     tanggal: new Date().toISOString().split('T')[0],
-    uraian: '',
-    adaTidakAda: 'ADA' as 'ADA' | 'TIDAK ADA',
-    klasifikasi: '',
-    kategori: '',
-    masuk: 0,
-    keluarVol: 0,
-    keluarSatuan: '',
-    keluarHargaSatuan: 0,
-    keluarTotal: 0,
-    saldo: 0,
+    notaNo: '',
+    items: [{
+      uraian: '',
+      klasifikasi: 'BAHAN',
+      jumlah: 0,
+      satuan: '',
+      hargaSatuan: 0,
+      hargaTotal: 0
+    }],
+    totalNota: 0,
     keterangan: ''
   });
+
+  const addItem = () => {
+    setForm(prev => ({
+      ...prev,
+      items: [...prev.items, {
+        uraian: '',
+        klasifikasi: 'BAHAN',
+        jumlah: 0,
+        satuan: '',
+        hargaSatuan: 0,
+        hargaTotal: 0
+      }]
+    }));
+  };
+
+  const removeItem = (idx: number) => {
+    if (form.items.length === 1) return;
+    const newItems = form.items.filter((_, i) => i !== idx);
+    const newTotal = newItems.reduce((acc, item) => acc + (item.hargaTotal || 0), 0);
+    setForm({ ...form, items: newItems, totalNota: newTotal });
+  };
+
+  const updateItem = (idx: number, field: string, val: any) => {
+    const newItems = [...form.items];
+    (newItems[idx] as any)[field] = val;
+    // If user changes quantity or price, we calculate recommendation but allow manual override
+    if (field === 'jumlah' || field === 'hargaSatuan') {
+      const item = newItems[idx];
+      item.hargaTotal = item.jumlah * item.hargaSatuan;
+    }
+    const newTotal = newItems.reduce((acc, item) => acc + (item.hargaTotal || 0), 0);
+    setForm({ ...form, items: newItems, totalNota: newTotal });
+  };
 
   return (
     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-bg-base w-full max-w-lg rounded-[32px] p-8 shadow-2xl relative border border-border-ig max-h-[90vh] overflow-y-auto custom-scrollbar text-left"
+        className="bg-bg-base w-full max-w-2xl rounded-[32px] p-8 shadow-2xl relative border border-border-ig max-h-[90vh] overflow-y-auto custom-scrollbar text-left"
       >
         <div className="flex items-center justify-between mb-8 sticky top-0 bg-bg-base z-10 pb-4">
-          <h3 className="text-base font-bold">Input Dana Lapangan</h3>
+          <div>
+            <h3 className="text-base font-bold">Input Dana Lapangan (Nota)</h3>
+            <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest mt-0.5">Satu nota untuk banyak item</p>
+          </div>
           <button onClick={onClose} className="text-ig-grey"><X size={24} /></button>
         </div>
 
         <form onSubmit={(e) => {
           e.preventDefault();
           onSubmit(form);
-        }} className="grid grid-cols-2 gap-4">
-          <div className="space-y-1 col-span-2">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Uraian</label>
-            <input 
-              required
-              type="text" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.uraian}
-              onChange={e => setForm({...form, uraian: e.target.value})}
-            />
+        }} className="space-y-6">
+          <div className="grid grid-cols-2 gap-4 bg-bg-alt p-4 rounded-2xl border border-border-ig">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">No. Nota (Header)</label>
+              <input 
+                required
+                type="text" 
+                className="w-full bg-white border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+                value={form.notaNo}
+                onChange={e => setForm({...form, notaNo: e.target.value})}
+                placeholder="Ex: NT-001"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Tanggal</label>
+              <input 
+                required
+                type="date" 
+                className="w-full bg-white border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+                value={form.tanggal}
+                onChange={e => setForm({...form, tanggal: e.target.value})}
+              />
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Tanggal</label>
-            <input 
-              required
-              type="date" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.tanggal}
-              onChange={e => setForm({...form, tanggal: e.target.value})}
-            />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold text-ig-blue uppercase tracking-widest">Daftar Item Pembelian</p>
+              <button 
+                type="button"
+                onClick={addItem}
+                className="text-[10px] font-bold text-ig-blue uppercase tracking-widest flex items-center gap-1 hover:opacity-70 transition-opacity"
+              >
+                <Plus size={14} /> Tambah Item
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {form.items.map((item, idx) => (
+                <div key={idx} className="p-4 bg-white border border-border-ig rounded-2xl relative group">
+                  {form.items.length > 1 && (
+                    <button 
+                      type="button"
+                      onClick={() => removeItem(idx)}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                  
+                  <div className="grid grid-cols-6 gap-3 mb-3">
+                    <div className="col-span-3 space-y-1">
+                      <label className="text-[9px] font-bold text-ig-grey uppercase">Uraian</label>
+                      <input 
+                        type="text" 
+                        required
+                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none" 
+                        value={item.uraian}
+                        onChange={e => updateItem(idx, 'uraian', e.target.value)}
+                        placeholder="Contoh: Semen Gresik"
+                      />
+                    </div>
+                    <div className="col-span-3 space-y-1">
+                      <label className="text-[9px] font-bold text-ig-grey uppercase">Klasifikasi</label>
+                      <select 
+                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none appearance-none"
+                        value={item.klasifikasi}
+                        onChange={e => updateItem(idx, 'klasifikasi', e.target.value)}
+                      >
+                        <option value="BAHAN">BAHAN</option>
+                        <option value="ALAT">ALAT</option>
+                        <option value="JASA">JASA</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-ig-grey uppercase">Jumlah</label>
+                      <input 
+                        type="number" 
+                        required
+                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none" 
+                        value={item.jumlah}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          updateItem(idx, 'jumlah', val);
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-ig-grey uppercase">Satuan</label>
+                      <input 
+                        type="text" 
+                        required
+                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none" 
+                        value={item.satuan}
+                        onChange={e => updateItem(idx, 'satuan', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-ig-grey uppercase">Harga Satuan</label>
+                      <input 
+                        type="number" 
+                        required
+                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none" 
+                        value={item.hargaSatuan}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          updateItem(idx, 'hargaSatuan', val);
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-ig-grey uppercase text-ig-blue">Harga Total</label>
+                      <input 
+                        type="number" 
+                        required
+                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-black outline-none border border-ig-blue/30 text-ig-blue" 
+                        value={item.hargaTotal}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value) || 0;
+                          updateItem(idx, 'hargaTotal', val);
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Ada / Tidak Ada</label>
-            <select 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none appearance-none"
-              value={form.adaTidakAda}
-              onChange={e => setForm({...form, adaTidakAda: e.target.value as any})}
+          <div className="pt-4 border-t border-border-ig flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Total Keseluruhan Nota</p>
+              <h4 className="text-xl font-black text-ig-blue">Rp {form.totalNota.toLocaleString()}</h4>
+            </div>
+            <button 
+              type="submit"
+              className="bg-ig-blue text-white px-8 py-4 rounded-2xl font-bold text-sm shadow-xl shadow-ig-blue/20 transition-all active:scale-95"
             >
-              <option value="ADA">ADA</option>
-              <option value="TIDAK ADA">TIDAK ADA</option>
-            </select>
+              Simpan Nota
+            </button>
           </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Klasifikasi</label>
-            <input 
-              type="text" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.klasifikasi}
-              onChange={e => setForm({...form, klasifikasi: e.target.value})}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Kategori</label>
-            <input 
-              type="text" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.kategori}
-              onChange={e => setForm({...form, kategori: e.target.value})}
-            />
-          </div>
-
-          <div className="col-span-2 border-t border-border-ig my-2 pt-4">
-             <p className="text-[10px] font-bold text-ig-blue uppercase tracking-widest mb-4">Nominal & Saldo</p>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Dana Masuk</label>
-            <input 
-              type="number" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.masuk}
-              onChange={e => setForm({...form, masuk: parseFloat(e.target.value) || 0})}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Volume Keluar</label>
-            <input 
-              type="number" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.keluarVol}
-              onChange={e => {
-                const val = parseFloat(e.target.value) || 0;
-                setForm(prev => ({ ...prev, keluarVol: val, keluarTotal: val * prev.keluarHargaSatuan }));
-              }}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Satuan Keluar</label>
-            <input 
-              type="text" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.keluarSatuan}
-              onChange={e => setForm({...form, keluarSatuan: e.target.value})}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Harga Satuan</label>
-            <input 
-              type="number" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.keluarHargaSatuan}
-              onChange={e => {
-                const val = parseFloat(e.target.value) || 0;
-                setForm(prev => ({ ...prev, keluarHargaSatuan: val, keluarTotal: val * prev.keluarVol }));
-              }}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Total Keluar (Auto)</label>
-            <input 
-              readOnly
-              type="number" 
-              className="w-full bg-ig-black/5 border border-border-ig rounded-xl px-4 py-3 text-sm font-bold outline-none"
-              value={form.keluarTotal}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Saldo Akhir</label>
-            <input 
-              type="number" 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.saldo}
-              onChange={e => setForm({...form, saldo: parseFloat(e.target.value) || 0})}
-            />
-          </div>
-
-          <div className="space-y-1 col-span-2">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Keterangan</label>
-            <textarea 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-medium focus:ring-1 focus:ring-ig-blue outline-none"
-              value={form.keterangan}
-              onChange={e => setForm({...form, keterangan: e.target.value})}
-            />
-          </div>
-
-          <button 
-            type="submit"
-            className="w-full col-span-2 bg-ig-blue text-white py-4 rounded-2xl font-bold text-sm shadow-xl shadow-ig-blue/20 transition-all active:scale-95 mt-4"
-          >
-            Input Dana Lapangan
-          </button>
         </form>
       </motion.div>
     </div>
