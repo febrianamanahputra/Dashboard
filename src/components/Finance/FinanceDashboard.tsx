@@ -27,7 +27,7 @@ export default function FinanceDashboard() {
                <CreditCard size={24} className="text-ig-black" strokeWidth={2} />
             </div>
             <div>
-               <h2 className="text-lg font-bold tracking-tight">Financial Ledger</h2>
+               <h2 className="text-lg font-bold tracking-tight">Divisi Finance</h2>
                <p className="text-ig-grey text-[11px] font-medium uppercase tracking-wider">Transaction Center</p>
             </div>
           </div>

@@ -57,8 +57,8 @@ export default function SCMDashboard() {
                  <Truck size={24} className="text-ig-black" strokeWidth={2} />
               </div>
               <div>
-                 <h2 className="text-lg font-bold tracking-tight">Manajemen Suplai</h2>
-                 <p className="text-ig-grey text-[11px] font-medium uppercase tracking-wider">Kontrol Logistik</p>
+                 <h2 className="text-lg font-bold tracking-tight">Divisi SCM</h2>
+                 <p className="text-ig-grey text-[11px] font-medium uppercase tracking-wider">Kontrol Suplai</p>
               </div>
             </div>
             

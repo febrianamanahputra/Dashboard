@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../AppContext';
 import { db } from '../../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw } from 'lucide-react';
+import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle } from 'lucide-react';
 import { StockEntry, MaterialRequest, RequestStatus } from '../../types';
 import RAPDashboard from '../RAP/RAPDashboard';
 import * as XLSX from 'xlsx';
@@ -70,6 +70,8 @@ export default function SMDashboard() {
   const [activeTab, setActiveTab] = useState<'active' | 'riwayat' | 'total' | 'stok'>('active');
   const [subStock, setSubStock] = useState<StockEntry[]>([]);
   const [receivingRequest, setReceivingRequest] = useState<MaterialRequest | null>(null);
+  const [activeView, setActiveView] = useState<'reports' | 'requests' | 'funds' | 'profile'>('requests');
+  const [reportDrafts, setReportDrafts] = useState<Record<string, string[]>>({});
 
   const activeProfile = profiles.find(p => p.id === activeProfileId);
   const profileSubs = subs.filter(s => s.profileId === activeProfileId);
@@ -94,6 +96,12 @@ export default function SMDashboard() {
     });
     return () => unsubscribe();
   }, [activeSubId]);
+
+  React.useEffect(() => {
+    const handleOpenMain = () => setShowMainRequestForm(true);
+    window.addEventListener('open-main-material', handleOpenMain);
+    return () => window.removeEventListener('open-main-material', handleOpenMain);
+  }, []);
 
   const subRequests = requests.filter(r => r.subId === activeSubId);
   
@@ -189,120 +197,114 @@ export default function SMDashboard() {
 
   return (
     <div className="relative h-full flex flex-col bg-bg-base overflow-hidden">
-      {/* Sidebar Profiles (Stories) */}
-      <div className="shrink-0 flex items-center gap-4 px-4 py-4 border-b border-border-ig overflow-x-auto custom-scrollbar bg-bg-base sticky top-0 z-20">
-        <button 
-          onClick={() => setShowAddProfile(true)}
-          className="shrink-0 w-14 h-14 rounded-full border-2 border-dashed border-border-ig flex items-center justify-center text-ig-grey hover:text-ig-blue hover:border-ig-blue transition-all"
-        >
-          <Plus size={24} />
-        </button>
-        
-        {profiles.map(prof => (
-          <button
-            key={prof.id}
-            onClick={() => {
-              setActiveProfileId(prof.id);
-              setActiveSubId(null); // Reset sub selection when profile changes
-            }}
-            className="shrink-0 flex flex-col items-center gap-1 group"
-          >
-            <div className={`w-16 h-16 rounded-full p-0.5 border-2 transition-all ${
-              activeProfileId === prof.id ? 'border-ig-blue' : 'border-transparent'
-            }`}>
-              <div className={`w-full h-full rounded-full flex items-center justify-center overflow-hidden transition-all ${
-                activeProfileId === prof.id ? 'bg-ig-blue text-white' : 'bg-bg-alt text-ig-grey border border-border-ig'
-              }`}>
-                {getProfileAvatar(prof)}
+      {/* Global Top Nav Bar for Sub Selection */}
+      {activeProfile && activeView !== 'profile' && (
+        <div className="bg-bg-base border-b border-border-ig flex flex-col shrink-0">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div 
+                onClick={() => setShowEditProfile(true)}
+                className="w-8 h-8 rounded-full bg-bg-alt flex items-center justify-center border border-border-ig overflow-hidden shrink-0 cursor-pointer"
+              >
+                {getProfileAvatar(activeProfile)}
               </div>
-            </div>
-            <span className={`text-[10px] font-semibold tracking-tight truncate w-16 text-center ${
-              activeProfileId === prof.id ? 'text-ig-black' : 'text-ig-grey'
-            }`}>{prof.name}</span>
-          </button>
-        ))}
-      </div>
-
-      <section className="flex-1 flex flex-col overflow-hidden bg-bg-alt">
-        {activeProfile ? (
-          <div className="flex-1 flex flex-col h-full overflow-hidden">
-            {/* iOS Style Segmented Control for Subs */}
-            <div className="px-4 py-3 bg-bg-base border-b border-border-ig overflow-x-auto">
-              <div className="flex bg-bg-alt p-1 rounded-xl gap-1">
-                {profileSubs.map(sub => (
-                  <button
-                    key={sub.id}
-                    onClick={() => setActiveSubId(sub.id)}
-                    className={`shrink-0 px-5 py-2 text-xs font-bold rounded-lg transition-all ${
-                      activeSubId === sub.id 
-                        ? 'bg-white text-ig-black shadow-sm ring-1 ring-black/5' 
-                        : 'text-ig-grey hover:text-ig-black'
-                    }`}
-                  >
-                    {sub.name}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setShowAddSub(true)}
-                  className="px-3 py-2 text-ig-grey hover:text-ig-blue transition-colors flex items-center justify-center"
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-              <div className="bg-bg-base border-b border-border-ig px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div 
-                    onClick={() => setShowEditProfile(true)}
-                    className="relative group w-10 h-10 rounded-full bg-bg-alt flex items-center justify-center border border-border-ig overflow-hidden shrink-0 cursor-pointer"
-                  >
-                    {getProfileAvatar(activeProfile)}
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold tracking-tight">{activeProfile.name}</h2>
-                    <p className="text-[10px] text-ig-grey font-medium uppercase tracking-widest leading-none">
-                      {profileSubs.find(s => s.id === activeSubId)?.name || 'Pilih Sub'}
-                    </p>
-                  </div>
+              <div>
+                <h2 className="text-sm font-bold tracking-tight leading-none mb-1">{activeProfile.name}</h2>
+                <div className="flex items-center gap-1.5 text-ig-blue">
+                   <MapPin size={10} strokeWidth={3} />
+                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                     {profileSubs.find(s => s.id === activeSubId)?.name || 'Pilih Sub'}
+                   </span>
                 </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+               {/* Buttons removed from here as they are moved to view-specific headers */}
+            </div>
+          </div>
 
-                <div className="flex items-center gap-4">
-                  {/* Budget RAP - Simbol Sheet Saja */}
+          {/* iOS Style Segmented Control for Subs (Horizontal Scroll) */}
+          <div className="px-4 pb-3 overflow-x-auto custom-scrollbar-hide">
+            <div className="flex bg-bg-alt p-1 rounded-xl gap-1 min-w-max">
+              {profileSubs.map(sub => (
+                <button
+                  key={sub.id}
+                  onClick={() => setActiveSubId(sub.id)}
+                  className={`shrink-0 px-5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                    activeSubId === sub.id 
+                      ? 'bg-white text-ig-black shadow-sm ring-1 ring-black/5' 
+                      : 'text-ig-grey hover:text-ig-black'
+                  }`}
+                >
+                  {sub.name}
+                </button>
+              ))}
+              <button
+                onClick={() => setShowAddSub(true)}
+                className="px-3 py-1.5 text-ig-grey hover:text-ig-blue transition-colors flex items-center justify-center"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="flex-1 flex flex-col overflow-hidden bg-bg-alt pb-[70px]">
+        <AnimatePresence mode="wait">
+          {activeView === 'reports' && (
+            <motion.div 
+              key="reports"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col h-full overflow-hidden"
+            >
+              <ReportView 
+                subId={activeSubId || ''} 
+                draftRows={activeSubId ? reportDrafts[activeSubId] : undefined}
+                onDraftChange={(newRows) => activeSubId && setReportDrafts(prev => ({ ...prev, [activeSubId]: newRows }))}
+              />
+            </motion.div>
+          )}
+
+          {activeView === 'requests' && (
+            <motion.div 
+              key="requests"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex flex-col h-full overflow-hidden"
+            >
+              {activeProfile ? (
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <div className="px-4 py-3 bg-bg-base flex items-center justify-between border-b border-border-ig">
+                <div className="flex items-center gap-2">
                    <button 
                     onClick={() => setView('rap')}
-                    className="p-2.5 text-ig-blue hover:bg-ig-blue/5 rounded-full transition-colors flex items-center justify-center"
-                    title="Budget RAP"
+                    className="p-2 text-ig-blue hover:bg-ig-blue/5 rounded-full transition-colors flex items-center gap-2"
                    >
-                      <FileSpreadsheet size={24} strokeWidth={1.5} />
+                      <FileSpreadsheet size={18} strokeWidth={2} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Budget RAP</span>
                    </button>
- 
-                   <div className="flex items-center gap-3 ml-1">
-                      {/* Request Material General */}
-                      <button 
-                        onClick={() => activeSubId && setShowAddForm(true)}
-                        disabled={!activeSubId}
-                        className={`transition-colors p-1 ${!activeSubId ? 'opacity-20 cursor-not-allowed' : 'text-ig-black hover:text-ig-blue'}`}
-                        title="Request Material"
-                      >
-                        <PlusSquare size={26} />
-                      </button>
- 
-                      {/* Request Material Utama */}
-                      <button 
-                        onClick={() => activeSubId && setShowMainRequestForm(true)}
-                        disabled={!activeSubId}
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all shadow-sm ${!activeSubId ? 'bg-ig-grey/20 cursor-not-allowed' : 'bg-ig-blue text-white hover:bg-ig-blue/90 shadow-ig-blue/20 shadow-md active:scale-95'}`}
-                        title="Request Utama"
-                      >
-                        <Plus size={22} strokeWidth={3} />
-                      </button>
-                   </div>
                 </div>
+                <button 
+                  onClick={() => activeSubId && setShowAddForm(true)}
+                  disabled={!activeSubId}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
+                    !activeSubId 
+                    ? 'opacity-20 cursor-not-allowed text-ig-grey' 
+                    : 'bg-ig-black text-white hover:bg-ig-black/90 active:scale-95 shadow-sm'
+                  }`}
+                >
+                  <PlusSquare size={16} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Request Material</span>
+                </button>
               </div>
 
-              {/* Segmented Control - Glass Style */}
+              {/* Tabs Section Only inside Requests */}
               <div className="px-4 py-6 bg-bg-base">
                 <div className="bg-bg-alt/50 backdrop-blur-md p-1 rounded-2xl flex items-center gap-1 relative overflow-hidden ring-1 ring-black/5">
                   {(['active', 'riwayat', 'total', 'stok'] as const).map((tab) => {
@@ -521,7 +523,69 @@ export default function SMDashboard() {
              <p className="text-ig-grey text-sm">Pilih lokasi proyek untuk mengelola stok dan permintaan</p>
           </div>
         )}
+            </motion.div>
+          )}
+
+          {activeView === 'funds' && (
+            <motion.div 
+              key="funds"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="flex-1 flex flex-col h-full overflow-hidden"
+            >
+              <FundsView subId={activeSubId || ''} />
+            </motion.div>
+          )}
+
+          {activeView === 'profile' && (
+            <motion.div 
+              key="profile"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="flex-1 flex flex-col h-full overflow-hidden"
+            >
+              <ProfileManagementView 
+                profiles={profiles}
+                activeProfileId={activeProfileId}
+                setActiveProfileId={setActiveProfileId}
+                setShowAddProfile={setShowAddProfile}
+                setShowEditProfile={setShowEditProfile}
+                getProfileAvatar={getProfileAvatar}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
+
+      {/* Bottom Navigation Bar */}
+      <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border-ig px-6 py-3 flex items-center justify-between z-[100] shadow-[0_-4px_10px_rgba(0,0,0,0.03)] h-[70px]">
+        <NavButton 
+          active={activeView === 'reports'} 
+          onClick={() => setActiveView('reports')} 
+          icon={<ClipboardList size={22} />} 
+          label="Report" 
+        />
+        <NavButton 
+          active={activeView === 'requests'} 
+          onClick={() => setActiveView('requests')} 
+          icon={<Package size={22} />} 
+          label="Request" 
+        />
+        <NavButton 
+          active={activeView === 'funds'} 
+          onClick={() => setActiveView('funds')} 
+          icon={<Wallet size={22} />} 
+          label="Dana" 
+        />
+        <NavButton 
+          active={activeView === 'profile'} 
+          onClick={() => setActiveView('profile')} 
+          icon={<UserCircle size={22} />} 
+          label="Profil" 
+        />
+      </div>
 
       {/* Modals with AnimatePresence */}
       <AnimatePresence>
@@ -709,6 +773,234 @@ export default function SMDashboard() {
   );
 }
 
+function NavButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`flex flex-col items-center gap-0.5 transition-all ${
+        active ? 'text-ig-blue scale-110' : 'text-ig-grey'
+      }`}
+    >
+      <div className={`${active ? 'bg-ig-blue/10 p-1.5 rounded-xl text-ig-blue' : 'p-1.5 text-ig-grey'}`}>
+        {icon}
+      </div>
+      <span className="text-[9px] font-bold uppercase tracking-tight">{label}</span>
+    </button>
+  );
+}
+
+function ReportView({ 
+  subId, 
+  draftRows, 
+  onDraftChange 
+}: { 
+  subId: string;
+  draftRows?: string[];
+  onDraftChange: (rows: string[]) => void;
+}) {
+  const { reportTemplates = [], updateReportTemplate } = useApp();
+  const [showSettings, setShowSettings] = useState(false);
+  const template = reportTemplates.find(t => t.subId === subId) || { heading: '', footer: '' };
+
+  // Local effect to handle rows state through parent
+  const rows = draftRows || ['', '', '', '', ''];
+
+  const updateRow = (index: number, value: string) => {
+    const newRows = [...rows];
+    newRows[index] = value;
+    onDraftChange(newRows);
+  };
+
+  const addRow = () => onDraftChange([...rows, '']);
+  const removeRow = (index: number) => {
+    if (rows.length <= 1) {
+      onDraftChange(['']);
+      return;
+    }
+    onDraftChange(rows.filter((_, i) => i !== index));
+  };
+
+  const rowColors = [
+    'from-blue-50/50 to-indigo-50/30',
+    'from-emerald-50/50 to-teal-50/30',
+    'from-rose-50/50 to-pink-50/30',
+    'from-amber-50/50 to-orange-50/30',
+    'from-purple-50/50 to-violet-50/30'
+  ];
+
+  const handleSendWA = (mode: 'full' | 'line', lineIndex?: number) => {
+    if (!subId) {
+      alert('Silahkan pilih sub lokasi terlebih dahulu');
+      return;
+    }
+
+    let message = '';
+    if (mode === 'full') {
+      const validLines = rows.filter(r => r.trim()).map(r => `Pek. ${r.trim()}`);
+      if (validLines.length === 0) return alert('Input laporan terlebih dahulu');
+      message = `${template.heading}\n\n${validLines.join('\n')}\n\n${template.footer}`;
+    } else if (lineIndex !== undefined) {
+      const lineText = rows[lineIndex].trim();
+      if (!lineText) return;
+      message = `Pek. ${lineText}`;
+    }
+
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+  };
+
+  return (
+    <div className="flex-1 flex flex-col h-full bg-bg-base overflow-hidden">
+      <div className="px-5 py-4 border-b border-border-ig flex items-center justify-between bg-bg-base sticky top-0 z-10 shadow-sm text-left">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-ig-blue/10 flex items-center justify-center text-ig-blue">
+            <ClipboardList size={22} />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold tracking-tight">Ketik Report Harian</h2>
+            <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest leading-none">Format WhatsApp Pek.</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => setShowSettings(!showSettings)}
+          className={`p-2.5 text-ig-grey hover:bg-bg-alt rounded-full transition-colors ${showSettings ? 'bg-ig-black text-white' : ''}`}
+        >
+          <Settings size={20} />
+        </button>
+      </div>
+
+      <div className="flex-1 p-4 overflow-y-auto custom-scrollbar pb-32">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1 mb-1">
+             <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Detail Pekerjaan (Caption)</label>
+             <button 
+              onClick={addRow}
+              className="text-ig-blue text-[10px] font-bold uppercase flex items-center gap-1 hover:opacity-70 transition-opacity"
+             >
+               <Plus size={14} /> Tambah Baris
+             </button>
+          </div>
+
+          <div className="space-y-1.5">
+            {rows.map((row, idx) => (
+              <div key={idx} className="flex items-center gap-2 group">
+                <div 
+                  className={`flex-1 flex items-center bg-gradient-to-br ${rowColors[idx % rowColors.length]} rounded-none border border-border-ig overflow-hidden focus-within:ring-1 focus-within:ring-ig-blue transition-all relative`}
+                >
+                  {/* Bubble Watermark Effect */}
+                  <div className="absolute right-10 -bottom-2 text-ig-blue/10 pointer-events-none select-none group-hover:scale-110 transition-transform">
+                     <div className="relative">
+                        <Circle size={40} className="opacity-20" strokeWidth={1} />
+                        <Circle size={20} className="absolute -top-2 -left-2 opacity-10" strokeWidth={1} />
+                     </div>
+                  </div>
+
+                  <div className="bg-white/40 backdrop-blur-sm px-2 py-2.5 border-r border-border-ig flex items-center justify-center min-w-[32px] z-10">
+                    <span className="text-[9px] font-bold text-ig-grey">{idx + 1}</span>
+                  </div>
+                  <input 
+                    type="text"
+                    className="flex-1 px-3 py-2 text-xs font-bold outline-none bg-transparent placeholder:italic placeholder:opacity-50 z-10"
+                    placeholder="Input detail pekerjaan..."
+                    value={row}
+                    onChange={(e) => updateRow(idx, e.target.value)}
+                  />
+                  <button 
+                    onClick={() => handleSendWA('line', idx)}
+                    disabled={!row.trim()}
+                    className={`p-2 transition-colors relative z-10 ${row.trim() ? 'text-[#25D366] hover:bg-green-50/50' : 'text-ig-grey opacity-20'}`}
+                    title="Kirim Baris Ini"
+                  >
+                    <Send size={14} />
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => removeRow(idx)}
+                  className="p-2 text-ig-grey hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-4">
+            <button 
+              onClick={() => handleSendWA('full')}
+              className="w-full bg-ig-black text-white h-12 rounded-xl flex items-center justify-center gap-2 transition-all hover:bg-ig-black/95 active:scale-[0.98] shadow-lg shadow-black/10"
+            >
+              <FileText size={18} />
+              <span className="text-[11px] font-bold uppercase tracking-widest">Kirim Full Report WhatsApp</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showSettings && (
+          <ReportSettingsModal 
+            subId={subId}
+            onClose={() => setShowSettings(false)}
+            initialTemplate={template}
+            onSave={(heading: string, footer: string) => {
+              updateReportTemplate(subId, heading, footer);
+              setShowSettings(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ReportSettingsModal({ subId, onClose, initialTemplate, onSave }: any) {
+  const [heading, setHeading] = useState(initialTemplate?.heading || '');
+  const [footer, setFooter] = useState(initialTemplate?.footer || '');
+
+  return (
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-bg-base w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-border-ig"
+      >
+        <div className="flex items-center justify-between mb-8">
+          <h3 className="text-base font-bold">Template Report</h3>
+          <button onClick={onClose} className="text-ig-grey"><X size={24} /></button>
+        </div>
+
+        <div className="space-y-6 text-left">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Pesan Pembuka (Heading)</label>
+            <textarea 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl p-4 text-sm font-medium focus:ring-1 focus:ring-ig-blue outline-none min-h-[100px]"
+              value={heading}
+              onChange={(e) => setHeading(e.target.value)}
+              placeholder="Contoh: Laporan Harian Proyek..."
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Pesan Penutup (Footer)</label>
+            <textarea 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl p-4 text-sm font-medium focus:ring-1 focus:ring-ig-blue outline-none min-h-[100px]"
+              value={footer}
+              onChange={(e) => setFooter(e.target.value)}
+              placeholder="Contoh: Terima Kasih."
+            />
+          </div>
+          <button 
+            onClick={() => onSave(heading, footer)}
+            className="w-full bg-ig-blue text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-ig-blue/20 transition-all active:scale-95"
+          >
+            Simpan Template
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, status }: { 
   onClose: () => void; 
   subId: string;
@@ -738,9 +1030,27 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
       >
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-base font-bold">{isEdit ? 'Edit Permintaan' : 'Request Material'}</h3>
-          <button onClick={onClose} className="text-ig-grey">
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+             {!isEdit && (
+               <button 
+                type="button"
+                onClick={() => {
+                  onClose();
+                  // Wait a bit for the animation
+                  setTimeout(() => {
+                    const event = new CustomEvent('open-main-material');
+                    window.dispatchEvent(event);
+                  }, 100);
+                }}
+                className="text-ig-blue text-[10px] font-bold uppercase tracking-wider bg-ig-blue/5 px-2 py-1.5 rounded-md border border-ig-blue/10 hover:bg-ig-blue/10 transition-colors"
+               >
+                 Material Utama
+               </button>
+             )}
+             <button onClick={onClose} className="text-ig-grey">
+               <X size={24} />
+             </button>
+          </div>
         </div>
 
         {isLocked && (
@@ -1229,6 +1539,373 @@ function ReceiveOrderModal({ onClose, request, onConfirm }: {
         >
           Konfirmasi Diterima
         </button>
+      </motion.div>
+    </div>
+  );
+}
+
+function FundsView({ subId }: { subId: string }) {
+  const { fieldFunds = [], addFieldFundEntry, deleteFieldFundEntry } = useApp();
+  const [showAdd, setShowAdd] = useState(false);
+  
+  const subFunds = fieldFunds.filter(f => f.subId === subId);
+
+  return (
+    <div className="flex-1 flex flex-col h-full bg-bg-base overflow-hidden">
+      <div className="px-4 py-4 border-b border-border-ig flex items-center justify-between bg-bg-base sticky top-0 z-10 shadow-sm text-left">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-600">
+            <Landmark size={22} />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold tracking-tight">Dana Lapangan</h2>
+            <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest leading-none">Petty Cash Proyek</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => {
+            if (!subId) return alert('Pilih sub lokasi terlebih dahulu');
+            setShowAdd(true);
+          }}
+          className="bg-ig-blue text-white w-9 h-9 rounded-lg flex items-center justify-center shadow-lg shadow-ig-blue/20 transition-all active:scale-90"
+        >
+          <Plus size={22} strokeWidth={3} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar pb-24">
+        {subFunds.length === 0 ? (
+          <div className="p-20 text-center opacity-30 flex flex-col items-center">
+            <Wallet size={48} className="mb-4" strokeWidth={1} />
+            <p className="text-xs font-bold uppercase tracking-widest">Belum ada input dana</p>
+          </div>
+        ) : (
+          <div className="min-w-[1200px] p-4 text-left">
+            <table className="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm border border-border-ig">
+              <thead>
+                <tr className="bg-bg-alt text-[9px] font-bold text-ig-grey uppercase tracking-widest text-left">
+                  <th className="p-3 border-b border-border-ig">NO</th>
+                  <th className="p-3 border-b border-border-ig">TANGGAL</th>
+                  <th className="p-3 border-b border-border-ig">URAIAN</th>
+                  <th className="p-3 border-b border-border-ig">ADA/TIDAK</th>
+                  <th className="p-3 border-b border-border-ig">KLASIFIKASI</th>
+                  <th className="p-3 border-b border-border-ig">KATEGORI</th>
+                  <th className="p-3 border-b border-border-ig">MASUK</th>
+                  <th className="p-3 border-b border-border-ig">VOL</th>
+                  <th className="p-3 border-b border-border-ig">SAT</th>
+                  <th className="p-3 border-b border-border-ig">HARGA</th>
+                  <th className="p-3 border-b border-border-ig">KELUAR (TOTAL)</th>
+                  <th className="p-3 border-b border-border-ig">SALDO</th>
+                  <th className="p-3 border-b border-border-ig">KETERANGAN</th>
+                  <th className="p-3 border-b border-border-ig">AKSI</th>
+                </tr>
+              </thead>
+              <tbody className="text-[11px] font-medium text-ig-black divide-y divide-gray-50 text-left">
+                {subFunds.map((fund, idx) => (
+                  <tr key={fund.id} className="hover:bg-bg-alt/30 transition-colors">
+                    <td className="p-3">{idx + 1}</td>
+                    <td className="p-3 font-bold">{fund.tanggal}</td>
+                    <td className="p-3 max-w-[200px] truncate">{fund.uraian}</td>
+                    <td className="p-3">
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${fund.adaTidakAda === 'ADA' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-500 border border-red-100'}`}>
+                        {fund.adaTidakAda}
+                      </span>
+                    </td>
+                    <td className="p-3">{fund.klasifikasi}</td>
+                    <td className="p-3">{fund.kategori}</td>
+                    <td className="p-3 text-green-600 font-bold">{(fund.masuk || 0).toLocaleString()}</td>
+                    <td className="p-3">{fund.keluarVol}</td>
+                    <td className="p-3">{fund.keluarSatuan}</td>
+                    <td className="p-3">{(fund.keluarHargaSatuan || 0).toLocaleString()}</td>
+                    <td className="p-3 text-red-500 font-bold">{(fund.keluarTotal || 0).toLocaleString()}</td>
+                    <td className="p-3 font-black italic">{(fund.saldo || 0).toLocaleString()}</td>
+                    <td className="p-3 italic text-ig-grey truncate max-w-[150px]">{fund.keterangan}</td>
+                    <td className="p-3">
+                      <button 
+                        onClick={() => deleteFieldFundEntry(fund.id)}
+                        className="p-1.5 text-red-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {showAdd && (
+          <FundEntryModal 
+            subId={subId}
+            onClose={() => setShowAdd(false)}
+            onSubmit={(entry: any) => {
+              addFieldFundEntry(entry);
+              setShowAdd(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ProfileManagementView({ 
+  profiles, 
+  activeProfileId, 
+  setActiveProfileId,
+  setShowAddProfile,
+  setShowEditProfile,
+  getProfileAvatar
+}: any) {
+
+  return (
+    <div className="flex-1 flex flex-col h-full bg-bg-alt overflow-hidden">
+      <div className="p-6 bg-white border-b border-border-ig sticky top-0 z-10 shadow-sm text-left">
+        <h2 className="text-lg font-bold tracking-tight">Manajemen Lokasi</h2>
+        <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest mt-1">Kelola Akun & Area Proyek</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-24 text-left">
+        <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest mb-6 px-1">Daftar Akun Utama / Lokasi</h3>
+        <div className="grid grid-cols-3 gap-6">
+          <button 
+            onClick={() => setShowAddProfile(true)}
+            className="flex flex-col items-center gap-3 active:scale-95 transition-transform"
+          >
+            <div className="w-20 h-20 rounded-full border-2 border-dashed border-border-ig flex items-center justify-center text-ig-grey hover:text-ig-blue hover:border-ig-blue transition-all bg-white shadow-sm">
+              <Plus size={32} />
+            </div>
+            <span className="text-[10px] font-bold text-ig-grey uppercase">Tambah</span>
+          </button>
+          
+          {profiles.map((prof: any) => (
+            <button
+              key={prof.id}
+              onClick={() => setActiveProfileId(prof.id)}
+              className="flex flex-col items-center gap-3 relative group active:scale-95 transition-all"
+            >
+              <div className={`w-20 h-20 rounded-3xl p-1 border-2 transition-all overflow-hidden ${
+                activeProfileId === prof.id ? 'border-ig-blue shadow-lg shadow-ig-blue/20 rotate-3' : 'border-white bg-white shadow-sm'
+              }`}>
+                <div className="w-full h-full rounded-2xl overflow-hidden flex items-center justify-center bg-bg-alt">
+                  {getProfileAvatar(prof)}
+                </div>
+              </div>
+              <span className={`text-[11px] font-bold tracking-tight truncate w-24 text-center ${
+                activeProfileId === prof.id ? 'text-ig-black' : 'text-ig-grey'
+              }`}>{prof.name}</span>
+              
+              {activeProfileId === prof.id && (
+                <div className="absolute top-0 right-0 -mr-1 -mt-1 w-6 h-6 bg-ig-blue text-white rounded-full flex items-center justify-center shadow-md animate-bounce">
+                  <CheckCircle2 size={14} strokeWidth={3} />
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {activeProfileId && (
+          <div className="mt-12 bg-white p-6 rounded-[32px] border border-border-ig shadow-xl shadow-black/5">
+             <div className="flex items-center justify-between mb-8">
+                <div>
+                   <h4 className="text-base font-bold">Opsi Pengaturan</h4>
+                   <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest mt-0.5">Edit atau Hapus Profile Aktif</p>
+                </div>
+                <button 
+                  onClick={() => setShowEditProfile(true)}
+                  className="bg-ig-black text-white px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-opacity"
+                >
+                  Edit Unit
+                </button>
+             </div>
+             
+             <div className="p-4 bg-bg-alt rounded-2xl flex items-center gap-4 text-xs font-bold italic text-ig-grey">
+                <AlertTriangle size={16} />
+                <span>Pilih profile di atas untuk menjadikannya aktif di dashboard utama.</span>
+             </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FundEntryModal({ subId, onClose, onSubmit }: any) {
+  const [form, setForm] = useState({
+    subId,
+    tanggal: new Date().toISOString().split('T')[0],
+    uraian: '',
+    adaTidakAda: 'ADA' as 'ADA' | 'TIDAK ADA',
+    klasifikasi: '',
+    kategori: '',
+    masuk: 0,
+    keluarVol: 0,
+    keluarSatuan: '',
+    keluarHargaSatuan: 0,
+    keluarTotal: 0,
+    saldo: 0,
+    keterangan: ''
+  });
+
+  return (
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-bg-base w-full max-w-lg rounded-[32px] p-8 shadow-2xl relative border border-border-ig max-h-[90vh] overflow-y-auto custom-scrollbar text-left"
+      >
+        <div className="flex items-center justify-between mb-8 sticky top-0 bg-bg-base z-10 pb-4">
+          <h3 className="text-base font-bold">Input Dana Lapangan</h3>
+          <button onClick={onClose} className="text-ig-grey"><X size={24} /></button>
+        </div>
+
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit(form);
+        }} className="grid grid-cols-2 gap-4">
+          <div className="space-y-1 col-span-2">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Uraian</label>
+            <input 
+              required
+              type="text" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.uraian}
+              onChange={e => setForm({...form, uraian: e.target.value})}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Tanggal</label>
+            <input 
+              required
+              type="date" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.tanggal}
+              onChange={e => setForm({...form, tanggal: e.target.value})}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Ada / Tidak Ada</label>
+            <select 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none appearance-none"
+              value={form.adaTidakAda}
+              onChange={e => setForm({...form, adaTidakAda: e.target.value as any})}
+            >
+              <option value="ADA">ADA</option>
+              <option value="TIDAK ADA">TIDAK ADA</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Klasifikasi</label>
+            <input 
+              type="text" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.klasifikasi}
+              onChange={e => setForm({...form, klasifikasi: e.target.value})}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Kategori</label>
+            <input 
+              type="text" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.kategori}
+              onChange={e => setForm({...form, kategori: e.target.value})}
+            />
+          </div>
+
+          <div className="col-span-2 border-t border-border-ig my-2 pt-4">
+             <p className="text-[10px] font-bold text-ig-blue uppercase tracking-widest mb-4">Nominal & Saldo</p>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Dana Masuk</label>
+            <input 
+              type="number" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.masuk}
+              onChange={e => setForm({...form, masuk: parseFloat(e.target.value) || 0})}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Volume Keluar</label>
+            <input 
+              type="number" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.keluarVol}
+              onChange={e => {
+                const val = parseFloat(e.target.value) || 0;
+                setForm(prev => ({ ...prev, keluarVol: val, keluarTotal: val * prev.keluarHargaSatuan }));
+              }}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Satuan Keluar</label>
+            <input 
+              type="text" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.keluarSatuan}
+              onChange={e => setForm({...form, keluarSatuan: e.target.value})}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Harga Satuan</label>
+            <input 
+              type="number" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.keluarHargaSatuan}
+              onChange={e => {
+                const val = parseFloat(e.target.value) || 0;
+                setForm(prev => ({ ...prev, keluarHargaSatuan: val, keluarTotal: val * prev.keluarVol }));
+              }}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Total Keluar (Auto)</label>
+            <input 
+              readOnly
+              type="number" 
+              className="w-full bg-ig-black/5 border border-border-ig rounded-xl px-4 py-3 text-sm font-bold outline-none"
+              value={form.keluarTotal}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Saldo Akhir</label>
+            <input 
+              type="number" 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.saldo}
+              onChange={e => setForm({...form, saldo: parseFloat(e.target.value) || 0})}
+            />
+          </div>
+
+          <div className="space-y-1 col-span-2">
+            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Keterangan</label>
+            <textarea 
+              className="w-full bg-bg-alt border border-border-ig rounded-xl px-4 py-3 text-sm font-medium focus:ring-1 focus:ring-ig-blue outline-none"
+              value={form.keterangan}
+              onChange={e => setForm({...form, keterangan: e.target.value})}
+            />
+          </div>
+
+          <button 
+            type="submit"
+            className="w-full col-span-2 bg-ig-blue text-white py-4 rounded-2xl font-bold text-sm shadow-xl shadow-ig-blue/20 transition-all active:scale-95 mt-4"
+          >
+            Input Dana Lapangan
+          </button>
+        </form>
       </motion.div>
     </div>
   );

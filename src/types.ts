@@ -85,3 +85,28 @@ export interface Notification {
   type: 'info' | 'success' | 'update';
   locationName?: string;
 }
+
+export interface FieldFundEntry {
+  id: string;
+  subId: string;
+  tanggal: string;
+  uraian: string;
+  adaTidakAda: 'ADA' | 'TIDAK ADA';
+  klasifikasi: string;
+  kategori: string;
+  masuk: number;
+  keluarVol: number;
+  keluarSatuan: string;
+  keluarHargaSatuan: number;
+  keluarTotal: number;
+  saldo: number;
+  keterangan: string;
+  createdAt: number;
+}
+
+export interface ReportTemplate {
+  id: string;
+  subId: string;
+  heading: string;
+  footer: string;
+}

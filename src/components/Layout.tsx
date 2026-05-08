@@ -86,21 +86,21 @@ export default function Layout() {
                 <h2 className="text-[11px] font-bold text-ig-grey uppercase ml-1 mb-4 opacity-50 tracking-wider">Saved Accounts</h2>
                 
                 <RoleAccount 
-                  name="Operation SM" 
-                  role="Site Manager"
+                  name="Divisi Konstruksi" 
+                  role="Operation"
                   icon={<HardHat size={22} className="text-white" />}
                   onClick={() => setRole('SM')}
                   gradient="bg-gradient-to-br from-blue-400 to-blue-600"
                 />
                 <RoleAccount 
-                  name="Logistics SCM" 
+                  name="Divisi SCM" 
                   role="Supply Chain"
                   icon={<Truck size={22} className="text-white" />}
                   onClick={() => setRole('SCM')}
                   gradient="bg-gradient-to-br from-green-400 to-green-600"
                 />
                 <RoleAccount 
-                  name="Consul Finance" 
+                  name="Divisi Finance" 
                   role="Financial Ledger"
                   icon={<Wallet size={22} className="text-white" />}
                   onClick={() => setRole('FINANCE')}
@@ -109,12 +109,6 @@ export default function Layout() {
               </div>
 
               <div className="mt-12 text-center">
-                <button 
-                  onClick={handleGoogleLogin} 
-                  className="text-ig-blue text-[13px] font-bold hover:text-black transition-colors"
-                >
-                  Configure Cloud Sheets Synchronization
-                </button>
               </div>
             </motion.div>
           </div>
@@ -169,7 +163,7 @@ export default function Layout() {
                     <ArrowLeft size={24} />
                   </button>
                   <span className="font-bold text-lg tracking-tight">
-                    {role === 'SM' ? 'Site Terminal' : role === 'SCM' ? 'Supply Core' : 'Finance Portal'}
+                    {role === 'SM' ? 'Divisi Konstruksi' : role === 'SCM' ? 'Divisi SCM' : 'Divisi Finance'}
                   </span>
                 </div>
                 
@@ -189,8 +183,8 @@ export default function Layout() {
                 </div>
               </header>
 
-              <main className="flex-1 overflow-y-auto custom-scrollbar p-0 lg:max-w-4xl lg:mx-auto lg:w-full">
-                <div className="min-h-full">
+              <main className="flex-1 overflow-hidden p-0 lg:max-w-4xl lg:mx-auto lg:w-full relative">
+                <div className="h-full">
                   <motion.div
                     key={role}
                     initial={{ opacity: 0 }}
@@ -203,15 +197,17 @@ export default function Layout() {
               </main>
 
               {/* Mobile Bottom Navigation (Instagram Style) */}
-              <footer className="lg:hidden h-[50px] border-t border-border-ig flex items-center justify-around bg-bg-base shrink-0">
-                <button onClick={() => setShowNotifications(false)} className="p-2">
-                   <Globe size={24} className={!showNotifications ? 'text-ig-black' : 'text-ig-grey'} />
-                </button>
-                <button onClick={() => setShowNotifications(true)} className="p-2 relative">
-                   <Bell size={24} className={showNotifications ? 'text-ig-black' : 'text-ig-grey'} />
-                   {unreadCount > 0 && <span className="absolute top-2 right-2 w-[8px] h-[8px] bg-red-500 rounded-full border border-bg-base" />}
-                </button>
-              </footer>
+              {role !== 'SM' && (
+                <footer className="lg:hidden h-[50px] border-t border-border-ig flex items-center justify-around bg-bg-base shrink-0">
+                  <button onClick={() => setShowNotifications(false)} className="p-2">
+                    <Globe size={24} className={!showNotifications ? 'text-ig-black' : 'text-ig-grey'} />
+                  </button>
+                  <button onClick={() => setShowNotifications(true)} className="p-2 relative">
+                    <Bell size={24} className={showNotifications ? 'text-ig-black' : 'text-ig-grey'} />
+                    {unreadCount > 0 && <span className="absolute top-2 right-2 w-[8px] h-[8px] bg-red-500 rounded-full border border-bg-base" />}
+                  </button>
+                </footer>
+              )}
             </div>
 
             {/* Notification Sidebar as Modal Overlay for Mobile Feel */}

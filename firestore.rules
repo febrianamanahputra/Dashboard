@@ -75,9 +75,48 @@ service cloud.firestore {
              data.unit is string && data.unit.size() > 0;
     }
 
+    function isValidFieldFund(data) {
+      return data.keys().hasAll(['subId', 'tanggal', 'uraian', 'adaTidakAda', 'klasifikasi', 'kategori', 'masuk', 'keluarVol', 'keluarSatuan', 'keluarHargaSatuan', 'keluarTotal', 'saldo', 'keterangan', 'createdAt']) &&
+             data.subId is string && isValidId(data.subId) &&
+             data.tanggal is string &&
+             data.uraian is string &&
+             data.adaTidakAda is string &&
+             data.klasifikasi is string &&
+             data.kategori is string &&
+             data.masuk is number &&
+             data.keluarVol is number &&
+             data.keluarSatuan is string &&
+             data.keluarHargaSatuan is number &&
+             data.keluarTotal is number &&
+             data.saldo is number &&
+             data.keterangan is string &&
+             data.createdAt is number;
+    }
+
+    function isValidReportTemplate(data) {
+      return data.keys().hasAll(['subId', 'heading', 'footer']) &&
+             data.subId is string && isValidId(data.subId) &&
+             data.heading is string &&
+             data.footer is string;
+    }
+
     // 3. COLLECTIONS
     match /mainMaterials/{id} {
       allow read, write: if true;
+    }
+
+    match /fieldFunds/{fundId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidFieldFund(incoming()) && isValidId(fundId);
+      allow update: if isSignedIn() && isValidFieldFund(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    match /reportTemplates/{templateId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidReportTemplate(incoming()) && isValidId(templateId);
+      allow update: if isSignedIn() && isValidReportTemplate(incoming());
+      allow delete: if isSignedIn();
     }
 
     // Collection Group Security

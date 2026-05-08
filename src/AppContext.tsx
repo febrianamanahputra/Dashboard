@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { MaterialRequest, Profile, Sub, RequestStatus, Notification, RAPItem, StockEntry, MainMaterial } from './types';
+import { MaterialRequest, Profile, Sub, RequestStatus, Notification, RAPItem, StockEntry, MainMaterial, FieldFundEntry, ReportTemplate } from './types';
 import { GoogleSheetsService, SpreadsheetRow } from './services/GoogleSheetsService';
 import { db, auth } from './lib/firebase';
 import { 
@@ -31,6 +31,8 @@ interface AppContextType {
   notifications: NotificationExtended[];
   rapData: RAPItem[];
   mainMaterials: MainMaterial[];
+  fieldFunds: FieldFundEntry[];
+  reportTemplates: ReportTemplate[];
   addProfile: (name: string, avatarUrl?: string) => void;
   updateProfile: (id: string, name: string, avatarUrl?: string) => void;
   removeProfile: (id: string) => void;
@@ -49,6 +51,9 @@ interface AppContextType {
   markNotificationsAsRead: (role: 'SM' | 'SCM' | 'FINANCE' | 'RAP') => void;
   setRapData: (subId: string, data: RAPItem[]) => void;
   updateStock: (subId: string, stockId: string, newQuantity: number) => void;
+  addFieldFundEntry: (entry: Omit<FieldFundEntry, 'id' | 'createdAt'>) => void;
+  deleteFieldFundEntry: (id: string) => void;
+  updateReportTemplate: (subId: string, heading: string, footer: string) => void;
   accessToken: string | null;
   setAccessToken: (token: string | null) => void;
   syncDirectToSheet: (req: MaterialRequest, locName: string) => void;
@@ -63,11 +68,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<NotificationExtended[]>([]);
   const [rapData, setRapItems] = useState<RAPItem[]>([]);
   const [mainMaterials, setMainMaterials] = useState<MainMaterial[]>([]);
+  const [fieldFunds, setFieldFunds] = useState<FieldFundEntry[]>([]);
+  const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([]);
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Real-time Listeners
   useEffect(() => {
-    // 1. Profiles
+    // ... existing listeners ...
+    // ... 5. Main Materials ...
+
+    // 6. Field Funds
+    const unsubscribeFieldFunds = onSnapshot(collection(db, 'fieldFunds'), (snapshot) => {
+      const items: FieldFundEntry[] = [];
+      snapshot.forEach(doc => {
+        items.push({ id: doc.id, ...doc.data() } as FieldFundEntry);
+      });
+      items.sort((a, b) => b.createdAt - a.createdAt);
+      setFieldFunds(items);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'fieldFunds'));
+
+    // 7. Report Templates
+    const unsubscribeTemplates = onSnapshot(collection(db, 'reportTemplates'), (snapshot) => {
+      const items: ReportTemplate[] = [];
+      snapshot.forEach(doc => {
+        items.push({ id: doc.id, ...doc.data() } as ReportTemplate);
+      });
+      setReportTemplates(items);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'reportTemplates'));
+
     const unsubscribeProfiles = onSnapshot(collection(db, 'profiles'), (snapshot) => {
       const projs: Profile[] = [];
       snapshot.forEach(doc => {
@@ -139,6 +167,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubscribeRap();
       unsubscribeNotifications();
       unsubscribeMainMaterials();
+      unsubscribeFieldFunds();
+      unsubscribeTemplates();
     };
   }, []);
 
@@ -487,6 +517,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const addFieldFundEntry = async (entry: Omit<FieldFundEntry, 'id' | 'createdAt'>) => {
+    try {
+      await addDoc(collection(db, 'fieldFunds'), {
+        ...entry,
+        createdAt: Date.now()
+      });
+      addNotification(`Dana Lapangan baru diinput: ${entry.uraian}`, 'FINANCE', 'info');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'fieldFunds');
+    }
+  };
+
+  const deleteFieldFundEntry = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'fieldFunds', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `fieldFunds/${id}`);
+    }
+  };
+
+  const updateReportTemplate = async (subId: string, heading: string, footer: string) => {
+    try {
+      const existing = reportTemplates.find(t => t.subId === subId);
+      if (existing) {
+        await updateDoc(doc(db, 'reportTemplates', existing.id), { heading, footer });
+      } else {
+        await addDoc(collection(db, 'reportTemplates'), { subId, heading, footer });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'reportTemplates');
+    }
+  };
+
   const markNotificationsAsRead = async (role: 'SM' | 'SCM' | 'FINANCE' | 'RAP') => {
     try {
       const updates = notifications
@@ -531,6 +594,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rapData,
       setRapData: updateRapData,
       updateStock,
+      addFieldFundEntry,
+      deleteFieldFundEntry,
+      updateReportTemplate,
+      fieldFunds,
+      reportTemplates,
       mainMaterials,
       accessToken,
       setAccessToken,
