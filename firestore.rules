@@ -76,20 +76,12 @@ service cloud.firestore {
     }
 
     function isValidFieldFund(data) {
-      return data.keys().hasAll(['subId', 'tanggal', 'uraian', 'adaTidakAda', 'klasifikasi', 'kategori', 'masuk', 'keluarVol', 'keluarSatuan', 'keluarHargaSatuan', 'keluarTotal', 'saldo', 'keterangan', 'createdAt']) &&
+      return data.keys().hasAll(['subId', 'tanggal', 'notaNo', 'items', 'totalNota', 'createdAt']) &&
              data.subId is string && isValidId(data.subId) &&
              data.tanggal is string &&
-             data.uraian is string &&
-             data.adaTidakAda is string &&
-             data.klasifikasi is string &&
-             data.kategori is string &&
-             data.masuk is number &&
-             data.keluarVol is number &&
-             data.keluarSatuan is string &&
-             data.keluarHargaSatuan is number &&
-             data.keluarTotal is number &&
-             data.saldo is number &&
-             data.keterangan is string &&
+             data.notaNo is string &&
+             data.items is list &&
+             data.totalNota is number &&
              data.createdAt is number;
     }
 
