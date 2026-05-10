@@ -64,6 +64,7 @@ export default function SMDashboard() {
   const [showAddSub, setShowAddSub] = useState(false);
   const [showEditSub, setShowEditSub] = useState<string | null>(null);
   const [selectedStock, setSelectedStock] = useState<StockEntry | null>(null);
+  const [selectedRequestForDetail, setSelectedRequestForDetail] = useState<MaterialRequest | null>(null);
   const [editQuantity, setEditQuantity] = useState<string>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [view, setView] = useState<'main' | 'rap'>('main');
@@ -345,35 +346,41 @@ export default function SMDashboard() {
                                  <p className="text-xs font-bold uppercase">Tidak ada permintaan aktif</p>
                               </div>
                             ) : (
-                              activeRequests.map(req => (
-                                <motion.div key={req.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="ig-card overflow-hidden group">
-                                  <div className="p-4 border-b border-border-ig flex items-center justify-between">
+                              <div className="space-y-1 mt-2">
+                                {activeRequests.map(req => (
+                                  <motion.button 
+                                    key={req.id} 
+                                    initial={{ opacity: 0, x: -10 }} 
+                                    animate={{ opacity: 1, x: 0 }} 
+                                    onClick={() => setSelectedRequestForDetail(req)}
+                                    className="w-full bg-white border border-border-ig flex items-center justify-between p-3 active:scale-[0.98] transition-all group hover:border-ig-blue/30 shadow-sm"
+                                  >
                                     <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-full bg-bg-alt flex items-center justify-center border border-border-ig">
-                                        <Package size={16} />
+                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center border shadow-sm ${getStatusColor(req.status)}`}>
+                                        <Package size={14} />
                                       </div>
-                                      <span className="font-bold text-sm tracking-tight">{req.materialName}</span>
+                                      <div className="text-left">
+                                        <p className="font-bold text-xs tracking-tight text-ig-black">{req.materialName}</p>
+                                        <p className="text-[10px] text-ig-grey font-medium">{req.quantity} {req.unit}</p>
+                                      </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] border shadow-sm ${getStatusColor(req.status)}`}>
-                                        {getStatusLabel(req.status)}
+                                    <div className="flex items-center gap-3">
+                                      <span className={`px-2 py-0.5 rounded-full text-[9px] border font-bold uppercase tracking-tighter ${getStatusColor(req.status)}`}>
+                                        {req.status === 'delivered' ? 'TERKIRIM' : getStatusLabel(req.status)}
                                       </span>
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if(confirm('Hapus request ini?')) deleteRequest(req.id);
+                                        }}
+                                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
                                     </div>
-                                  </div>
-                                  <div className="p-4">
-                                    <div className="flex items-baseline justify-between mb-2">
-                                       <span className="text-2xl font-bold tracking-tighter">{req.quantity} <span className="text-xs font-medium text-ig-grey uppercase tracking-widest">{req.unit}</span></span>
-                                       <span className="text-[11px] text-ig-grey font-medium">Batas: {new Date(req.dateNeeded).toLocaleDateString()}</span>
-                                    </div>
-                                    <div className="flex gap-2 mt-4">
-                                      {req.status === 'delivered' && (
-                                        <button onClick={() => setReceivingRequest(req)} className="flex-1 bg-ig-blue text-white py-2 rounded-md font-bold text-[13px] hover:opacity-90 transition-opacity">Selesaikan Penerimaan</button>
-                                      )}
-                                      <button onClick={() => setEditingRequest(req)} className="p-2 rounded-md border border-border-ig text-ig-grey hover:bg-bg-alt transition-colors"><Edit2 size={16} /></button>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              ))
+                                  </motion.button>
+                                ))}
+                              </div>
                             )}
                           </>
                         )}
@@ -435,15 +442,26 @@ export default function SMDashboard() {
                                  <p className="text-xs font-bold uppercase tracking-widest">Stok kosong</p>
                               </div>
                             ) : (
-                              <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1 mt-2">
                                 {subStock.map((entry) => (
-                                  <motion.button  layout key={entry.id} onClick={() => { setSelectedStock(entry); setEditQuantity(entry.quantity.toString()); }} className="ig-card p-4 flex flex-col gap-1 transition-all hover:ring-2 hover:ring-ig-blue active:scale-95">
-                                    <span className="text-[9px] font-bold text-ig-grey uppercase tracking-widest">{entry.materialName}</span>
-                                    <div className="flex items-baseline gap-1 mt-1">
-                                      <span className="text-2xl font-black italic tracking-tighter text-ig-black">{entry.quantity}</span>
-                                      <span className="text-[10px] font-bold uppercase text-ig-grey">{entry.unit}</span>
+                                  <motion.button 
+                                    layout 
+                                    key={entry.id} 
+                                    onClick={() => { setSelectedStock(entry); setEditQuantity(entry.quantity.toString()); }} 
+                                    className="w-full bg-white border border-border-ig flex items-center justify-between p-3 active:scale-[0.98] transition-all group hover:border-ig-blue/30 shadow-sm"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-lg bg-bg-alt flex items-center justify-center border border-border-ig text-ig-grey">
+                                        <Box size={14} />
+                                      </div>
+                                      <div className="text-left text-ig-black">
+                                        <p className="font-bold text-xs tracking-tight">{entry.materialName}</p>
+                                        <p className="text-[10px] text-ig-grey font-medium opacity-60">Update: {new Date(entry.dateReceived).toLocaleDateString('id-ID')}</p>
+                                      </div>
                                     </div>
-                                    <div className="mt-2 text-[8px] text-ig-grey uppercase font-bold flex items-center gap-1 opacity-60"><RefreshCw size={8} /> {new Date(entry.dateReceived).toLocaleDateString('id-ID')}</div>
+                                    <div className="text-right">
+                                      <p className="text-sm font-black italic text-ig-blue">{entry.quantity} <span className="text-[10px] text-ig-grey uppercase">{entry.unit}</span></p>
+                                    </div>
                                   </motion.button>
                                 ))}
                               </div>
@@ -622,51 +640,152 @@ export default function SMDashboard() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {selectedStock && (
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+        {selectedRequestForDetail && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[300] flex items-center justify-center p-4">
             <motion.div 
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative border border-border-ig flex flex-col"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col"
             >
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-base font-bold">Edit Quantity</h3>
-                <button onClick={() => setSelectedStock(null)} className="text-ig-grey">
-                  <X size={24} />
-                </button>
+              <div className="px-8 py-8 border-b border-border-ig text-center">
+                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border shadow-sm ${getStatusColor(selectedRequestForDetail.status)}`}>
+                    <Package size={32} />
+                 </div>
+                 <h2 className="text-xl font-black tracking-tight mb-1">{selectedRequestForDetail.materialName}</h2>
+                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(selectedRequestForDetail.status)}`}>
+                    {getStatusLabel(selectedRequestForDetail.status)}
+                 </span>
               </div>
 
-              <div className="space-y-6">
-                <div>
-                  <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider mb-2">Material</p>
-                  <p className="font-bold text-base">{selectedStock.materialName}</p>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider">Adjustment</label>
-                  <div className="flex items-center gap-3">
-                    <input 
-                      type="number"
-                      className="flex-1 bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-lg font-bold focus:ring-1 focus:ring-ig-blue outline-none transition-all"
-                      value={editQuantity}
-                      onChange={(e) => setEditQuantity(e.target.value)}
-                    />
-                    <span className="font-bold text-ig-grey uppercase text-xs">{selectedStock.unit}</span>
-                  </div>
+              <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Kuantitas</p>
+                      <p className="text-lg font-black">{selectedRequestForDetail.quantity} <span className="text-xs uppercase text-ig-grey">{selectedRequestForDetail.unit}</span></p>
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Batas Waktu</p>
+                      <p className="text-sm font-bold text-ig-black">{new Date(selectedRequestForDetail.dateNeeded).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                   </div>
                 </div>
 
-                <button 
-                  onClick={() => {
-                    if (activeSubId && selectedStock) {
-                      updateStock(activeSubId, selectedStock.id, parseFloat(editQuantity) || 0);
-                      setSelectedStock(null);
-                    }
-                  }}
-                  className="w-full bg-ig-blue text-white py-3 rounded-md font-bold text-[14px] hover:opacity-90 transition-opacity"
-                >
-                  Save Changes
-                </button>
+                {selectedRequestForDetail.description && (
+                  <div className="space-y-1 bg-bg-alt p-4 rounded-2xl border border-border-ig">
+                    <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Keterangan / Detail</p>
+                    <p className="text-xs font-medium text-ig-black leading-relaxed">{selectedRequestForDetail.description}</p>
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  {selectedRequestForDetail.status === 'delivered' && (
+                    <button 
+                      onClick={() => {
+                        setReceivingRequest(selectedRequestForDetail);
+                        setSelectedRequestForDetail(null);
+                      }} 
+                      className="w-full bg-[#25D366] text-white py-4 rounded-2xl font-black text-sm shadow-lg shadow-green-500/20 flex items-center justify-center gap-3"
+                    >
+                      TERIMA MATERIAL
+                    </button>
+                  )}
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setEditingRequest(selectedRequestForDetail);
+                        setSelectedRequestForDetail(null);
+                      }}
+                      className="flex-1 bg-bg-alt text-ig-black py-4 rounded-2xl font-black text-sm border border-border-ig hover:bg-white transition-all flex items-center justify-center gap-2"
+                    >
+                      <Edit2 size={16} /> EDIT
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if(confirm('Hapus request ini?')) {
+                          deleteRequest(selectedRequestForDetail.id);
+                          setSelectedRequestForDetail(null);
+                        }
+                      }}
+                      className="flex-1 bg-red-50 text-red-500 py-4 rounded-2xl font-black text-sm border border-red-100 hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Trash2 size={16} /> HAPUS
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedRequestForDetail(null)}
+                    className="w-full py-2 text-[10px] font-bold text-ig-grey uppercase tracking-widest"
+                  >
+                    TUTUP
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedStock && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[300] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="px-8 py-8 border-b border-border-ig text-center">
+                 <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4 border border-blue-100 text-ig-blue shadow-sm">
+                    <Box size={32} />
+                 </div>
+                 <h2 className="text-xl font-black tracking-tight mb-1">{selectedStock.materialName}</h2>
+                 <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Informasi Stok Gudang</p>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="bg-bg-alt rounded-3xl p-6 border border-border-ig text-center">
+                   <p className="text-4xl font-black italic tracking-tighter text-ig-blue mb-1">{selectedStock.quantity}</p>
+                   <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">{selectedStock.unit}</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                   <div className="flex items-center justify-between px-4 py-3 bg-bg-alt/50 rounded-xl">
+                      <span className="text-[10px] font-bold text-ig-grey uppercase">Terakhir Update</span>
+                      <span className="text-xs font-bold">{new Date(selectedStock.dateReceived).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                   </div>
+                </div>
+                
+                <div className="space-y-3 pt-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Koreksi Jumlah Manual</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="number"
+                          className="flex-1 bg-bg-alt border border-border-ig rounded-2xl px-4 py-4 text-lg font-black focus:ring-2 focus:ring-ig-blue outline-none transition-all"
+                          value={editQuantity}
+                          onChange={(e) => setEditQuantity(e.target.value)}
+                        />
+                        <button 
+                          onClick={() => {
+                            if (activeSubId && selectedStock) {
+                              updateStock(activeSubId, selectedStock.id, parseFloat(editQuantity) || 0);
+                              setSelectedStock(null);
+                            }
+                          }}
+                          className="bg-ig-black text-white px-6 rounded-2xl font-black text-sm shadow-lg shadow-black/10 active:scale-95 transition-all"
+                        >
+                          UPDATE
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedStock(null)}
+                    className="w-full py-4 text-[10px] font-bold text-ig-grey uppercase tracking-widest mt-4"
+                  >
+                    KEMBALI
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -846,19 +965,19 @@ function ReportView({
             {rows.map((row, idx) => (
               <div key={idx} className="flex items-center gap-2 group">
                 <div 
-                  className={`flex-1 flex items-center bg-gradient-to-br ${rowColors[idx % rowColors.length]} rounded-none border border-border-ig overflow-hidden focus-within:ring-1 focus-within:ring-ig-blue transition-all relative`}
+                  className={`flex-1 flex items-center bg-[#25D366] rounded-none border border-[#128C7E]/20 overflow-hidden focus-within:ring-2 focus-within:ring-white/50 transition-all relative shadow-sm`}
                 >
                   {/* Bubble Watermark Effect */}
-                  <div className="absolute right-10 -bottom-2 text-ig-blue/10 pointer-events-none select-none group-hover:scale-110 transition-transform">
+                  <div className="absolute right-10 -bottom-2 text-white/10 pointer-events-none select-none group-hover:scale-110 transition-transform">
                      <div className="relative">
-                        <Circle size={40} className="opacity-20" strokeWidth={1} />
-                        <Circle size={20} className="absolute -top-2 -left-2 opacity-10" strokeWidth={1} />
+                        <Circle size={40} className="opacity-10" strokeWidth={1} />
+                        <Circle size={20} className="absolute -top-2 -left-2 opacity-5" strokeWidth={1} />
                      </div>
                   </div>
 
                   <input 
                     type="text"
-                    className="flex-1 px-4 py-3 text-xs font-bold outline-none bg-transparent placeholder:italic placeholder:opacity-50 z-10"
+                    className="flex-1 px-4 py-3 text-xs font-bold outline-none bg-transparent text-white placeholder:text-white/60 placeholder:italic z-10"
                     placeholder="Input detail pekerjaan..."
                     value={row}
                     onChange={(e) => updateRow(idx, e.target.value)}
@@ -866,7 +985,7 @@ function ReportView({
                   <button 
                     onClick={() => handleSendWA('line', idx)}
                     disabled={!row.trim()}
-                    className={`p-2 transition-colors relative z-10 ${row.trim() ? 'text-[#25D366] hover:bg-green-50/50' : 'text-ig-grey opacity-20'}`}
+                    className={`p-2 transition-colors relative z-10 ${row.trim() ? 'text-white hover:bg-white/10' : 'text-white/30'}`}
                     title="Kirim Baris Ini"
                   >
                     <Send size={14} />
