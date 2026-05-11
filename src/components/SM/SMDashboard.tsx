@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../AppContext';
 import { db } from '../../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle } from 'lucide-react';
+import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle, Truck, Check, Banknote, MessageCircle } from 'lucide-react';
 import { StockEntry, MaterialRequest, RequestStatus } from '../../types';
 import RAPDashboard from '../RAP/RAPDashboard';
 import * as XLSX from 'xlsx';
@@ -150,24 +150,74 @@ export default function SMDashboard() {
 
   const getStatusLabel = (s: string) => {
     switch (s) {
-      case 'pending': return 'Belum di proses';
-      case 'processing': return 'Diproses';
+      case 'pending': return 'Belum Di Proses';
+      case 'processing': return 'Sedang Di Proses';
       case 'awaiting_payment': return 'Menunggu Pembayaran';
       case 'paid': return 'Pembayaran Berhasil';
       case 'delivered': return 'Pengantaran';
-      case 'received': return 'Diterima';
-      case 'on_hold': return 'HOLD / INDENT';
+      case 'received': return 'Selesai Diterima';
+      case 'on_hold': return 'Tertunda (Hold)';
       default: return s;
     }
   };
 
   const getStatusColor = (s: string) => {
     switch (s) {
-      case 'delivered': return 'bg-blue-50 text-ig-blue border-blue-100 italic font-medium';
-      case 'on_hold': return 'bg-red-50 text-red-500 border-red-100';
-      case 'pending': return 'bg-gray-50 text-ig-grey border-border-ig';
-      case 'paid': return 'bg-green-50 text-green-600 border-green-100 font-bold';
-      default: return 'bg-gray-50 text-ig-black border-border-ig';
+      case 'pending': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30';
+      case 'processing': return 'bg-orange-500/10 text-orange-500 border-orange-500/30';
+      case 'awaiting_payment': return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+      case 'paid': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30';
+      case 'delivered': return 'bg-green-500/10 text-green-500 border-green-500/30';
+      case 'received': return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+      case 'on_hold': return 'bg-red-500/10 text-red-500 border-red-500/30';
+      default: return 'bg-white/5 text-white border-white/10';
+    }
+  };
+
+  const getRequestTheme = (s: string) => {
+    switch (s) {
+      case 'pending': 
+        return {
+          bg: 'bg-transparent',
+          text: 'text-white',
+          badge: 'bg-white/10 text-white border-white/20',
+          watermark: null
+        };
+      case 'processing':
+        return {
+          bg: 'bg-transparent',
+          text: 'text-white',
+          badge: 'bg-white/10 text-white border-white/20',
+          watermark: null
+        };
+      case 'awaiting_payment':
+        return {
+          bg: 'bg-transparent',
+          text: 'text-white',
+          badge: 'bg-white/10 text-white border-white/20',
+          watermark: null
+        };
+      case 'paid':
+        return {
+          bg: 'bg-transparent',
+          text: 'text-white',
+          badge: 'bg-white/10 text-white border-white/20',
+          watermark: null
+        };
+      case 'delivered':
+        return {
+          bg: 'bg-transparent',
+          text: 'text-white',
+          badge: 'bg-white/10 text-white border-white/20',
+          watermark: null
+        };
+      default:
+        return {
+          bg: 'bg-transparent',
+          text: 'text-white',
+          badge: 'bg-white/10 text-white border-white/20',
+          watermark: null
+        };
     }
   };
 
@@ -198,62 +248,65 @@ export default function SMDashboard() {
   };
 
   return (
-    <div className="relative h-full flex flex-col bg-bg-base overflow-hidden">
+    <div className="relative h-full flex flex-col bg-transparent overflow-hidden">
       {/* Global Top Nav Bar for Sub Selection */}
       {activeProfile && activeView !== 'profile' && (
-        <div className="bg-bg-base border-b border-border-ig flex flex-col shrink-0">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div 
-                onClick={() => setShowEditProfile(true)}
-                className="w-8 h-8 rounded-full bg-bg-alt flex items-center justify-center border border-border-ig overflow-hidden shrink-0 cursor-pointer"
-              >
-                {getProfileAvatar(activeProfile)}
-              </div>
-              <div>
-                <h2 className="text-sm font-bold tracking-tight leading-none mb-1">{activeProfile.name}</h2>
-                <div className="flex items-center gap-1.5 text-ig-blue">
-                   <MapPin size={10} strokeWidth={3} />
-                   <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-                     {profileSubs.find(s => s.id === activeSubId)?.name || 'Pilih Sub'}
-                   </span>
+        <div 
+          className="relative overflow-hidden shrink-0 border-b border-white/10"
+        >
+          {/* Overlay to ensure readability */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-md" />
+          
+          <div className="relative z-10">
+            <div className="px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-white">
+                <div 
+                  onClick={() => setShowEditProfile(true)}
+                  className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20 overflow-hidden shrink-0 cursor-pointer"
+                >
+                  {getProfileAvatar(activeProfile)}
+                </div>
+                <div>
+                  <h2 className="text-sm font-black tracking-tight leading-none mb-1 text-white">{activeProfile.name}</h2>
+                  <div className="flex items-center gap-1.5 text-white/60">
+                    <MapPin size={10} strokeWidth={3} />
+                    <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                      {profileSubs.find(s => s.id === activeSubId)?.name || 'Pilih Sub'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-            
-            <div className="flex items-center gap-2">
-               {/* Buttons removed from here as they are moved to view-specific headers */}
-            </div>
-          </div>
 
-          {/* iOS Style Segmented Control for Subs (Horizontal Scroll) */}
-          <div className="px-4 pb-3 overflow-x-auto custom-scrollbar-hide">
-            <div className="flex bg-bg-alt p-1 rounded-xl gap-1 min-w-max">
-              {profileSubs.map(sub => (
+            {/* iOS Style Segmented Control for Subs (Horizontal Scroll) */}
+            <div className="px-4 pb-3 overflow-x-auto custom-scrollbar-hide">
+              <div className="flex bg-white/10 backdrop-blur-md p-1 rounded-xl gap-1 min-w-max border border-white/10">
+                {profileSubs.map(sub => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setActiveSubId(sub.id)}
+                    className={`shrink-0 px-5 py-1.5 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest ${
+                      activeSubId === sub.id 
+                        ? 'bg-white text-ig-blue shadow-lg' 
+                        : 'text-white/60 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    {sub.name}
+                  </button>
+                ))}
                 <button
-                  key={sub.id}
-                  onClick={() => setActiveSubId(sub.id)}
-                  className={`shrink-0 px-5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                    activeSubId === sub.id 
-                      ? 'bg-white text-ig-black shadow-sm ring-1 ring-black/5' 
-                      : 'text-ig-grey hover:text-ig-black'
-                  }`}
+                  onClick={() => setShowAddSub(true)}
+                  className="px-3 py-1.5 text-white/40 hover:text-white transition-colors flex items-center justify-center"
                 >
-                  {sub.name}
+                  <Plus size={14} strokeWidth={3} />
                 </button>
-              ))}
-              <button
-                onClick={() => setShowAddSub(true)}
-                className="px-3 py-1.5 text-ig-grey hover:text-ig-blue transition-colors flex items-center justify-center"
-              >
-                <Plus size={14} />
-              </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      <section className="flex-1 flex flex-col overflow-hidden bg-bg-alt pb-[85px] md:pb-[70px] safe-area-pb">
+      <section className="flex-1 flex flex-col overflow-hidden bg-transparent pb-[85px] md:pb-[70px] safe-area-pb">
         <AnimatePresence mode="wait">
           <>
             {activeView === 'reports' && (
@@ -282,8 +335,11 @@ export default function SMDashboard() {
               >
                   <div className="flex-1 flex flex-col h-full overflow-hidden">
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
-                      <div className="px-4 py-3 bg-bg-base flex items-center justify-between border-b border-border-ig">
-                        <div className="flex items-center p-1.5 bg-gradient-to-br from-[#25D366] to-[#128C7E] rounded-2xl shadow-lg shadow-green-500/20 gap-1">
+                      <div 
+                        className="px-4 py-3 flex items-center justify-between border-b border-white/10 relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-black/20 backdrop-blur-md" />
+                        <div className="flex items-center p-1.5 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-xl gap-1 relative z-10">
                            <button 
                             onClick={() => setView('rap')}
                             className="flex items-center gap-2 px-3 py-2 text-white hover:bg-white/10 rounded-xl transition-all"
@@ -307,8 +363,8 @@ export default function SMDashboard() {
                         </div>
                       </div>
                       {/* Tabs moved to Request specific section */}
-                      <div className="px-4 py-6 bg-bg-base">
-                        <div className="bg-bg-alt/50 backdrop-blur-md p-1 rounded-2xl flex items-center gap-1 relative overflow-hidden ring-1 ring-black/5">
+                      <div className="px-4 py-6 bg-transparent">
+                        <div className="bg-transparent p-1 rounded-2xl flex items-center gap-1 relative overflow-hidden border border-white/20">
                           {(['active', 'riwayat', 'total', 'stok'] as const).map((tab) => {
                             const isActive = activeTab === tab;
                             const labels = { active: 'Aktif', riwayat: 'Riwayat', total: 'Total', stok: 'Stok' };
@@ -318,17 +374,16 @@ export default function SMDashboard() {
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
                                 className={`relative flex-1 py-3 flex items-center justify-center z-10 transition-all duration-300 ${
-                                  isActive ? 'text-[#00FF00]' : 'text-ig-grey hover:text-ig-black'
-                                }`}
-                              >
+                                  isActive ? 'text-white' : 'text-white/40 hover:text-white/60'
+                                }`}>
                                 {isActive && (
                                   <motion.div 
                                     layoutId="glass-bubble"
-                                    className="absolute inset-0 bg-white/60 backdrop-blur-xl rounded-xl shadow-[0_4px_15px_rgba(0,0,0,0.05)] border border-white/20"
+                                    className="absolute inset-x-0 bottom-0 h-0.5 bg-white rounded-full shadow-lg"
                                     transition={{ type: "spring", bounce: 0.25, duration: 0.5 }}
                                   />
                                 )}
-                                <span className="text-[10px] font-bold uppercase tracking-widest relative z-10">{labels[tab]}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest relative z-10">{labels[tab]}</span>
                               </button>
                             )
                           })}
@@ -347,39 +402,48 @@ export default function SMDashboard() {
                               </div>
                             ) : (
                               <div className="space-y-1 mt-2">
-                                {activeRequests.map(req => (
-                                  <motion.button 
-                                    key={req.id} 
-                                    initial={{ opacity: 0, x: -10 }} 
-                                    animate={{ opacity: 1, x: 0 }} 
-                                    onClick={() => setSelectedRequestForDetail(req)}
-                                    className="w-full bg-white border border-border-ig flex items-center justify-between p-3 active:scale-[0.98] transition-all group hover:border-ig-blue/30 shadow-sm"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center border shadow-sm ${getStatusColor(req.status)}`}>
-                                        <Package size={14} />
+                                {activeRequests.map(req => {
+                                  const theme = getRequestTheme(req.status);
+                                  return (
+                                    <motion.button 
+                                      key={req.id} 
+                                      initial={{ opacity: 0, x: -10 }} 
+                                      animate={{ opacity: 1, x: 0 }} 
+                                      onClick={() => setSelectedRequestForDetail(req)}
+                                      className={`w-full ${theme.bg} border border-white/10 flex items-center justify-between p-4 active:scale-[0.98] transition-all group hover:brightness-105 shadow-md rounded-2xl relative overflow-hidden mb-2`}
+                                    >
+                                      {theme.watermark}
+                                      <div className="flex items-center gap-4 relative z-10">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border border-white/20 bg-white/10 backdrop-blur-sm shadow-sm ${theme.text}`}>
+                                          {req.status === 'pending' && <Clock size={18} />}
+                                          {req.status === 'processing' && <RefreshCw size={18} />}
+                                          {req.status === 'awaiting_payment' && <Wallet size={18} />}
+                                          {req.status === 'paid' && <CheckCircle2 size={18} />}
+                                          {req.status === 'delivered' && <Truck size={18} />}
+                                          {!['pending', 'processing', 'awaiting_payment', 'paid', 'delivered'].includes(req.status) && <Package size={18} />}
+                                        </div>
+                                        <div className="text-left">
+                                          <p className={`font-black text-sm tracking-tight ${theme.text}`}>{req.materialName}</p>
+                                          <p className={`text-[10px] font-bold uppercase tracking-widest ${theme.text} opacity-80`}>{req.quantity} {req.unit}</p>
+                                        </div>
                                       </div>
-                                      <div className="text-left">
-                                        <p className="font-bold text-xs tracking-tight text-ig-black">{req.materialName}</p>
-                                        <p className="text-[10px] text-ig-grey font-medium">{req.quantity} {req.unit}</p>
+                                      <div className="flex items-center gap-3 relative z-10">
+                                        <span className={`px-3 py-1 rounded-full text-[9px] border font-black uppercase tracking-widest shadow-sm ${theme.badge}`}>
+                                          {getStatusLabel(req.status)}
+                                        </span>
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if(confirm('Hapus request ini?')) deleteRequest(req.id);
+                                          }}
+                                          className={`p-2 ${theme.text} hover:bg-white/10 rounded-xl transition-all opacity-60 hover:opacity-100`}
+                                        >
+                                          <Trash2 size={18} />
+                                        </button>
                                       </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <span className={`px-2 py-0.5 rounded-full text-[9px] border font-bold uppercase tracking-tighter ${getStatusColor(req.status)}`}>
-                                        {req.status === 'delivered' ? 'TERKIRIM' : getStatusLabel(req.status)}
-                                      </span>
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if(confirm('Hapus request ini?')) deleteRequest(req.id);
-                                        }}
-                                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                      >
-                                        <Trash2 size={16} />
-                                      </button>
-                                    </div>
-                                  </motion.button>
-                                ))}
+                                    </motion.button>
+                                  );
+                                })}
                               </div>
                             )}
                           </>
@@ -418,14 +482,14 @@ export default function SMDashboard() {
                                  <p className="p-8 text-center text-xs text-ig-grey font-bold">Belum ada data tersedia</p>
                                ) : (
                                  totalsArray.map((item, idx) => (
-                                   <div key={idx} className="p-4 flex items-center justify-between bg-white">
+                                   <div key={idx} className="p-4 flex items-center justify-between bg-white/10 backdrop-blur-sm border-b border-white/5">
                                       <div>
-                                        <p className="text-sm font-bold tracking-tight">{item.materialName}</p>
-                                        <p className="text-[10px] text-ig-black font-bold uppercase tracking-tighter mt-0.5">Sudah Diterima</p>
+                                        <p className="text-sm font-bold tracking-tight text-white">{item.materialName}</p>
+                                        <p className="text-[10px] text-white/50 font-bold uppercase tracking-tighter mt-0.5">Sudah Diterima</p>
                                       </div>
                                       <div className="text-right">
-                                        <p className="text-xl font-black italic tracking-tighter leading-none text-ig-blue">{item.quantity}</p>
-                                        <span className="text-[10px] font-bold uppercase text-ig-grey">{item.unit}</span>
+                                        <p className="text-xl font-black italic tracking-tighter leading-none text-white">{item.quantity}</p>
+                                        <span className="text-[10px] font-bold uppercase text-white/40">{item.unit}</span>
                                       </div>
                                    </div>
                                  ))
@@ -448,19 +512,19 @@ export default function SMDashboard() {
                                     layout 
                                     key={entry.id} 
                                     onClick={() => { setSelectedStock(entry); setEditQuantity(entry.quantity.toString()); }} 
-                                    className="w-full bg-white border border-border-ig flex items-center justify-between p-3 active:scale-[0.98] transition-all group hover:border-ig-blue/30 shadow-sm"
+                                    className="w-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-between p-4 rounded-2xl active:scale-[0.98] transition-all group hover:bg-white/20 shadow-xl"
                                   >
                                     <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 rounded-lg bg-bg-alt flex items-center justify-center border border-border-ig text-ig-grey">
+                                      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 text-white/40">
                                         <Box size={14} />
                                       </div>
-                                      <div className="text-left text-ig-black">
-                                        <p className="font-bold text-xs tracking-tight">{entry.materialName}</p>
-                                        <p className="text-[10px] text-ig-grey font-medium opacity-60">Update: {new Date(entry.dateReceived).toLocaleDateString('id-ID')}</p>
+                                      <div className="text-left text-white">
+                                        <p className="font-black text-xs tracking-tight">{entry.materialName}</p>
+                                        <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">Update: {new Date(entry.dateReceived).toLocaleDateString('id-ID')}</p>
                                       </div>
                                     </div>
                                     <div className="text-right">
-                                      <p className="text-sm font-black italic text-ig-blue">{entry.quantity} <span className="text-[10px] text-ig-grey uppercase">{entry.unit}</span></p>
+                                      <p className="text-sm font-black italic text-white">{entry.quantity} <span className="text-[10px] text-white/40 uppercase font-black">{entry.unit}</span></p>
                                     </div>
                                   </motion.button>
                                 ))}
@@ -521,7 +585,7 @@ export default function SMDashboard() {
         </AnimatePresence>
 
         {/* Bottom Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-border-ig px-2 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-around z-[100] shadow-[0_-4px_20px_rgba(0,0,0,0.05)] min-h-[70px] md:h-[70px]">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 px-2 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-around z-[100] shadow-[0_-10px_30px_rgba(0,0,0,0.3)] min-h-[70px] md:h-[70px] overflow-hidden bg-black/20 backdrop-blur-2xl">
         <NavButton 
           active={activeView === 'reports'} 
           onClick={() => setActiveView('reports')} 
@@ -646,34 +710,47 @@ export default function SMDashboard() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col"
+              className="bg-white/20 backdrop-blur-2xl w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col border border-white/20"
             >
-              <div className="px-8 py-8 border-b border-border-ig text-center">
-                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 border shadow-sm ${getStatusColor(selectedRequestForDetail.status)}`}>
-                    <Package size={32} />
-                 </div>
-                 <h2 className="text-xl font-black tracking-tight mb-1">{selectedRequestForDetail.materialName}</h2>
-                 <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(selectedRequestForDetail.status)}`}>
-                    {getStatusLabel(selectedRequestForDetail.status)}
-                 </span>
-              </div>
+              {(() => {
+                const theme = getRequestTheme(selectedRequestForDetail.status);
+                return (
+                  <div className={`px-8 py-10 ${theme.bg} text-center relative overflow-hidden`}>
+                    {theme.watermark}
+                    <div className="relative z-10">
+                      <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-white/20 bg-white/10 backdrop-blur-md shadow-lg text-white">
+                        {selectedRequestForDetail.status === 'pending' && <Clock size={40} />}
+                        {selectedRequestForDetail.status === 'processing' && <RefreshCw size={40} />}
+                        {selectedRequestForDetail.status === 'awaiting_payment' && <Wallet size={40} />}
+                        {selectedRequestForDetail.status === 'paid' && <CheckCircle2 size={40} />}
+                        {selectedRequestForDetail.status === 'delivered' && <Truck size={40} />}
+                        {!['pending', 'processing', 'awaiting_payment', 'paid', 'delivered'].includes(selectedRequestForDetail.status) && <Package size={40} />}
+                      </div>
+                      <h2 className="text-2xl font-black tracking-tight mb-2 text-white">{selectedRequestForDetail.materialName}</h2>
+                      <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${theme.badge}`}>
+                        {getStatusLabel(selectedRequestForDetail.status)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Kuantitas</p>
-                      <p className="text-lg font-black">{selectedRequestForDetail.quantity} <span className="text-xs uppercase text-ig-grey">{selectedRequestForDetail.unit}</span></p>
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Kuantitas</p>
+                      <p className="text-lg font-black text-white">{selectedRequestForDetail.quantity} <span className="text-xs uppercase text-white/40">{selectedRequestForDetail.unit}</span></p>
                    </div>
                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Batas Waktu</p>
-                      <p className="text-sm font-bold text-ig-black">{new Date(selectedRequestForDetail.dateNeeded).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Batas Waktu</p>
+                      <p className="text-sm font-bold text-white">{new Date(selectedRequestForDetail.dateNeeded).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                    </div>
                 </div>
 
                 {selectedRequestForDetail.description && (
-                  <div className="space-y-1 bg-bg-alt p-4 rounded-2xl border border-border-ig">
-                    <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Keterangan / Detail</p>
-                    <p className="text-xs font-medium text-ig-black leading-relaxed">{selectedRequestForDetail.description}</p>
+                  <div className="space-y-1 bg-white/5 p-4 rounded-2xl border border-white/10">
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Keterangan / Detail</p>
+                    <p className="text-xs font-medium text-white/80 leading-relaxed">{selectedRequestForDetail.description}</p>
                   </div>
                 )}
                 
@@ -695,7 +772,7 @@ export default function SMDashboard() {
                         setEditingRequest(selectedRequestForDetail);
                         setSelectedRequestForDetail(null);
                       }}
-                      className="flex-1 bg-bg-alt text-ig-black py-4 rounded-2xl font-black text-sm border border-border-ig hover:bg-white transition-all flex items-center justify-center gap-2"
+                      className="flex-1 bg-white/10 text-white py-4 rounded-2xl font-black text-sm border border-white/20 hover:bg-white/20 transition-all flex items-center justify-center gap-2 shadow-xl"
                     >
                       <Edit2 size={16} /> EDIT
                     </button>
@@ -731,26 +808,26 @@ export default function SMDashboard() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col"
+              className="bg-white/20 backdrop-blur-2xl w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col border border-white/20"
             >
-              <div className="px-8 py-8 border-b border-border-ig text-center">
-                 <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4 border border-blue-100 text-ig-blue shadow-sm">
+              <div className="px-8 py-8 border-b border-white/10 text-center">
+                 <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-4 border border-white/20 text-white shadow-xl">
                     <Box size={32} />
                  </div>
-                 <h2 className="text-xl font-black tracking-tight mb-1">{selectedStock.materialName}</h2>
-                 <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Informasi Stok Gudang</p>
+                 <h2 className="text-xl font-black tracking-tight mb-1 text-white">{selectedStock.materialName}</h2>
+                 <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Informasi Stok Gudang</p>
               </div>
 
               <div className="p-8 space-y-6">
-                <div className="bg-bg-alt rounded-3xl p-6 border border-border-ig text-center">
-                   <p className="text-4xl font-black italic tracking-tighter text-ig-blue mb-1">{selectedStock.quantity}</p>
-                   <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">{selectedStock.unit}</p>
+                <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/10 text-center">
+                   <p className="text-4xl font-black italic tracking-tighter text-white mb-1">{selectedStock.quantity}</p>
+                   <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{selectedStock.unit}</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                   <div className="flex items-center justify-between px-4 py-3 bg-bg-alt/50 rounded-xl">
-                      <span className="text-[10px] font-bold text-ig-grey uppercase">Terakhir Update</span>
-                      <span className="text-xs font-bold">{new Date(selectedStock.dateReceived).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                   <div className="flex items-center justify-between px-4 py-3 bg-white/10 rounded-xl">
+                      <span className="text-[10px] font-bold text-white/40 uppercase">Terakhir Update</span>
+                      <span className="text-xs font-bold text-white">{new Date(selectedStock.dateReceived).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                    </div>
                 </div>
                 
@@ -761,7 +838,7 @@ export default function SMDashboard() {
                       <div className="flex gap-2">
                         <input 
                           type="number"
-                          className="flex-1 bg-bg-alt border border-border-ig rounded-2xl px-4 py-4 text-lg font-black focus:ring-2 focus:ring-ig-blue outline-none transition-all"
+                          className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-lg font-black text-white focus:ring-2 focus:ring-white/40 outline-none transition-all"
                           value={editQuantity}
                           onChange={(e) => setEditQuantity(e.target.value)}
                         />
@@ -799,7 +876,7 @@ export default function SMDashboard() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative border border-border-ig text-center"
+              className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/20 text-center"
             >
               <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6 mx-auto border border-red-100">
                 <AlertTriangle size={32} />
@@ -838,15 +915,22 @@ export default function SMDashboard() {
 function NavButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
     <button 
-      onClick={onClick}
-      className={`flex flex-col items-center gap-0.5 transition-all ${
-        active ? 'text-ig-blue scale-110' : 'text-ig-grey'
+      onClick={onClick} 
+      className={`flex flex-col items-center gap-1.5 transition-all relative px-4 py-2 rounded-2xl ${
+        active 
+          ? 'text-white' 
+          : 'text-white/30 hover:text-white/60'
       }`}
     >
-      <div className={`${active ? 'bg-ig-blue/10 p-1.5 rounded-xl text-ig-blue' : 'p-1.5 text-ig-grey'}`}>
-        {icon}
-      </div>
-      <span className="text-[9px] font-bold uppercase tracking-tight">{label}</span>
+      {active && (
+        <motion.div 
+          layoutId="nav-glow"
+          className="absolute inset-0 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg"
+          transition={{ type: 'spring', bounce: 0.3, duration: 0.6 }}
+        />
+      )}
+      <div className="relative z-10">{icon}</div>
+      <span className="text-[9px] font-black uppercase tracking-[0.2em] relative z-10">{label}</span>
     </button>
   );
 }
@@ -942,22 +1026,22 @@ function ReportView({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-bg-base overflow-hidden">
-      <div className="px-5 py-4 border-b border-border-ig flex items-center justify-between bg-bg-base sticky top-0 z-10 shadow-sm text-left">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold tracking-tight">Report Harian</h2>
+    <div className="flex-1 flex flex-col h-full bg-transparent overflow-hidden">
+      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between sticky top-0 z-10 text-left">
+        <div className="flex items-center gap-2 relative z-10">
+          <h2 className="text-sm font-black text-white uppercase tracking-widest">Report Harian</h2>
         </div>
       </div>
 
       <div className="flex-1 p-4 overflow-y-auto custom-scrollbar pb-32">
         <div className="space-y-2">
-          <div className="flex items-center justify-between px-1 mb-1">
-             <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Detail Pekerjaan (Caption)</label>
+          <div className="flex items-center justify-between px-1 mb-2">
+             <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Detail Pekerjaan (Caption)</label>
              <button 
               onClick={addRow}
-              className="text-ig-blue text-[10px] font-bold uppercase tracking-widest hover:opacity-70 transition-opacity"
+              className="text-white/80 text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors flex items-center gap-1"
              >
-               Tambah Baris
+               <Plus size={12} /> Tambah Baris
              </button>
           </div>
 
@@ -965,16 +1049,8 @@ function ReportView({
             {rows.map((row, idx) => (
               <div key={idx} className="flex items-center gap-2 group">
                 <div 
-                  className={`flex-1 flex items-center bg-[#25D366] rounded-none border border-[#128C7E]/20 overflow-hidden focus-within:ring-2 focus-within:ring-white/50 transition-all relative shadow-sm`}
+                  className={`flex-1 flex items-center bg-transparent border-b border-white/20 overflow-hidden focus-within:border-white/60 transition-all relative`}
                 >
-                  {/* Bubble Watermark Effect */}
-                  <div className="absolute right-10 -bottom-2 text-white/10 pointer-events-none select-none group-hover:scale-110 transition-transform">
-                     <div className="relative">
-                        <Circle size={40} className="opacity-10" strokeWidth={1} />
-                        <Circle size={20} className="absolute -top-2 -left-2 opacity-5" strokeWidth={1} />
-                     </div>
-                  </div>
-
                   <input 
                     type="text"
                     className="flex-1 px-4 py-3 text-xs font-bold outline-none bg-transparent text-white placeholder:text-white/60 placeholder:italic z-10"
@@ -994,9 +1070,9 @@ function ReportView({
 
                 <button 
                    onClick={() => removeRow(idx)}
-                   className="p-2 text-ig-grey hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                   className="p-2 text-white/30 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             ))}
@@ -1005,10 +1081,10 @@ function ReportView({
           <div className="pt-6">
             <button 
               onClick={() => handleSendWA('full')}
-              className="w-full bg-[#25D366] text-white py-4 rounded-none flex items-center justify-center gap-3 transition-all hover:opacity-95 active:scale-[0.98] shadow-lg shadow-green-500/10"
+              className="w-full bg-[#25D366] text-white py-5 rounded-none flex items-center justify-center gap-3 transition-all hover:brightness-110 active:scale-[0.98] shadow-2xl font-black uppercase tracking-[0.2em]"
             >
-              <Send size={18} />
-              <span className="text-[11px] font-bold uppercase tracking-widest">Kirim Report WhatsApp</span>
+              <Send size={20} fill="currentColor" />
+              <span className="text-xs font-black">Kirim Report WhatsApp</span>
             </button>
             <div className="mt-4 opacity-50 text-center">
               <p className="text-[9px] font-bold text-ig-grey uppercase tracking-widest">Templating Otomatis Berdasarkan Waktu</p>
@@ -1039,31 +1115,32 @@ function ReportSettingsModal({ subId, onClose, initialTemplate, onSave }: any) {
   const [footer, setFooter] = useState(initialTemplate?.footer || '');
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[250] flex items-center justify-center p-4">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-bg-base w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-border-ig"
+        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/20"
       >
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-base font-bold">Template Report</h3>
-          <button onClick={onClose} className="text-ig-grey"><X size={24} /></button>
+          <h3 className="text-base font-black text-white">Template Report</h3>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors"><X size={24} /></button>
         </div>
 
         <div className="space-y-6 text-left">
           <div className="space-y-2">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Pesan Pembuka (Heading)</label>
+            <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Pesan Pembuka (Heading)</label>
             <textarea 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl p-4 text-sm font-medium focus:ring-1 focus:ring-ig-blue outline-none min-h-[100px]"
+              className="w-full bg-transparent border border-white/20 rounded-2xl p-4 text-sm font-black text-white outline-none min-h-[100px] transition-all"
               value={heading}
               onChange={(e) => setHeading(e.target.value)}
               placeholder="Contoh: Laporan Harian Proyek..."
             />
           </div>
+
           <div className="space-y-2">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Pesan Penutup (Footer)</label>
+            <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Pesan Penutup (Footer)</label>
             <textarea 
-              className="w-full bg-bg-alt border border-border-ig rounded-xl p-4 text-sm font-medium focus:ring-1 focus:ring-ig-blue outline-none min-h-[100px]"
+              className="w-full bg-transparent border border-white/20 rounded-2xl p-4 text-sm font-black text-white outline-none min-h-[100px] transition-all"
               value={footer}
               onChange={(e) => setFooter(e.target.value)}
               placeholder="Contoh: Terima Kasih."
@@ -1071,7 +1148,7 @@ function ReportSettingsModal({ subId, onClose, initialTemplate, onSave }: any) {
           </div>
           <button 
             onClick={() => onSave(heading, footer)}
-            className="w-full bg-ig-blue text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-ig-blue/20 transition-all active:scale-95"
+            className="w-full bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
           >
             Simpan Template
           </button>
@@ -1102,11 +1179,11 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
   const isLocked = status && status !== 'pending';
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[200] flex items-center justify-center p-4">
       <motion.div 
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative border border-border-ig flex flex-col"
+        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/20 flex flex-col"
       >
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-base font-bold">{isEdit ? 'Edit Permintaan' : 'Request Material'}</h3>
@@ -1122,7 +1199,7 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
                     window.dispatchEvent(event);
                   }, 100);
                 }}
-                className="text-ig-blue text-[10px] font-bold uppercase tracking-wider bg-ig-blue/5 px-2 py-1.5 rounded-md border border-ig-blue/10 hover:bg-ig-blue/10 transition-colors"
+                className="text-white text-[10px] font-black uppercase tracking-widest bg-white/10 px-3 py-1.5 rounded-xl border border-white/20 hover:bg-white/20 transition-all shadow-sm"
                >
                  Material Utama
                </button>
@@ -1149,52 +1226,52 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
           onSubmit(form);
           onClose();
         }} className="space-y-6">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Nama Material</label>
+          <div className="space-y-1.5 text-left">
+            <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Nama Material</label>
             <input 
               required
               disabled={isSubmitting}
               type="text" 
               placeholder="Contoh: Semen Padang"
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all"
               value={form.materialName}
               onChange={e => setForm({...form, materialName: e.target.value})}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Jumlah</label>
+            <div className="space-y-1.5 text-left">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Jumlah</label>
               <input 
                 required
                 disabled={isSubmitting}
                 type="number" 
                 min="1"
-                className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+                className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all"
                 value={form.quantity}
                 onChange={e => setForm({...form, quantity: parseFloat(e.target.value) || 0})}
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Satuan</label>
+            <div className="space-y-1.5 text-left">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Satuan</label>
               <select 
                 disabled={isSubmitting}
-                className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none appearance-none"
+                className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none appearance-none cursor-pointer"
                 value={form.unit}
                 onChange={e => setForm({...form, unit: e.target.value})}
               >
-                {UNITS.map(u => <option key={u} value={u}>{u.toUpperCase()}</option>)}
+                {UNITS.map(u => <option key={u} value={u} className="text-black">{u.toUpperCase()}</option>)}
               </select>
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Batas Tanggal</label>
+          <div className="space-y-1.5 text-left">
+            <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Batas Tanggal</label>
             <input 
               required
               disabled={isSubmitting}
               type="date" 
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all color-scheme-dark"
               value={form.dateNeeded}
               onChange={e => setForm({...form, dateNeeded: e.target.value})}
             />
@@ -1203,7 +1280,7 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
           <button 
             type="submit"
             disabled={isSubmitting}
-            className="w-full mt-4 bg-ig-blue text-white py-4 rounded-md font-bold text-sm shadow-lg shadow-ig-blue/20"
+            className="w-full mt-4 bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
           >
             {isSubmitting ? 'Mengirim...' : isEdit ? (isLocked ? 'Kirim Permintaan Edit' : 'Simpan Perubahan') : 'Kirim Request'}
           </button>
@@ -1233,15 +1310,15 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
   const selectedMaterial = materials?.find(m => m.id === selectedMaterialId);
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[200] flex items-center justify-center p-4">
       <motion.div 
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative border border-border-ig flex flex-col"
+        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/20 flex flex-col"
       >
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-base font-bold">Request Material Utama</h3>
-          <button onClick={onClose} className="text-ig-grey">
+          <h3 className="text-base font-black text-white">Request Material Utama</h3>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
             <X size={24} />
           </button>
         </div>
@@ -1260,46 +1337,46 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
           });
         }} className="space-y-6">
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Pilih Material</label>
+            <label className="text-[10px] font-bold text-white/50 uppercase tracking-wider ml-1">Pilih Material</label>
             <select 
               required
               disabled={isSubmitting}
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none appearance-none"
+              className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white focus:bg-white/10 outline-none appearance-none cursor-pointer"
               value={selectedMaterialId}
               onChange={e => setSelectedMaterialId(e.target.value)}
             >
-              <option value="" disabled>Pilih Material...</option>
+              <option value="" disabled className="text-black">Pilih Material...</option>
               {materials.map(m => (
-                <option key={m.id} value={m.id}>{m.name.toUpperCase()} ({m.unit.toUpperCase()})</option>
+                <option key={m.id} value={m.id} className="text-black">{m.name.toUpperCase()} ({m.unit.toUpperCase()})</option>
               ))}
             </select>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Jumlah</label>
+            <label className="text-[10px] font-bold text-white/50 uppercase tracking-wider ml-1">Jumlah</label>
             <div className="flex items-center gap-3">
               <input 
                 required
                 disabled={isSubmitting}
                 type="number" 
                 min="1"
-                className="flex-1 bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+                className="flex-1 bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10"
                 value={quantity}
                 onChange={e => setQuantity(parseFloat(e.target.value) || 0)}
               />
-              <span className="font-bold text-ig-grey uppercase text-xs">
+              <span className="font-black text-white/60 uppercase text-[10px]">
                 {selectedMaterial?.unit || '-'}
               </span>
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Batas Tanggal</label>
+            <label className="text-[10px] font-bold text-white/50 uppercase tracking-wider ml-1">Batas Tanggal</label>
             <input 
               required
               disabled={isSubmitting}
               type="date" 
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 color-scheme-dark"
               value={dateNeeded}
               onChange={e => setDateNeeded(e.target.value)}
             />
@@ -1308,7 +1385,7 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
           <button 
             type="submit"
             disabled={isSubmitting || !selectedMaterialId}
-            className="w-full mt-4 bg-ig-blue text-white py-4 rounded-md font-bold text-sm shadow-lg shadow-ig-blue/20 disabled:opacity-50"
+            className="w-full mt-4 bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
           >
             {isSubmitting ? 'Mengirim...' : 'Kirim Request Utama'}
           </button>
@@ -1340,27 +1417,27 @@ function EditProfileModal({ profile, onClose, onUpdate, onDelete }: {
   };
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[200] flex items-center justify-center p-4">
       <motion.div 
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl border border-border-ig flex flex-col"
+        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-white/20 flex flex-col"
       >
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-base font-bold">Pengaturan Profile</h3>
-          <button onClick={onClose} className="text-ig-grey">
+          <h3 className="text-base font-black text-white">Pengaturan Profile</h3>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
             <X size={24} />
           </button>
         </div>
 
         <div className="space-y-6">
           <div className="flex flex-col items-center gap-4">
-             <div className="w-24 h-24 rounded-full border-2 border-ig-blue p-1">
-                <div className="w-full h-full rounded-full bg-bg-alt border border-border-ig flex items-center justify-center overflow-hidden">
+             <div className="w-24 h-24 rounded-full border-2 border-white/20 p-1 bg-transparent shadow-xl">
+                <div className="w-full h-full rounded-full bg-transparent border border-white/10 flex items-center justify-center overflow-hidden">
                    {avatarUrl ? (
                      <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
                    ) : (
-                     <UserCircle size={48} className="text-ig-grey" />
+                     <UserCircle size={48} className="text-white/20" />
                    )}
                 </div>
              </div>
@@ -1373,19 +1450,19 @@ function EditProfileModal({ profile, onClose, onUpdate, onDelete }: {
              />
              <button 
               onClick={() => fileInputRef.current?.click()}
-              className="text-xs font-bold text-ig-blue flex items-center gap-1"
+              className="text-xs font-black text-white hover:text-white/80 flex items-center gap-2 uppercase tracking-widest"
              >
                 <Camera size={14} />
-                Ganti Foto Profile
+                Ganti Foto
              </button>
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Nama Profile</label>
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Nama Profile</label>
               <input 
                 type="text"
-                className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 transition-all font-sans"
                 value={name}
                 onChange={e => setName(e.target.value)}
               />
@@ -1395,13 +1472,13 @@ function EditProfileModal({ profile, onClose, onUpdate, onDelete }: {
           <div className="flex flex-col gap-3">
             <button 
               onClick={() => onUpdate(name, avatarUrl)}
-              className="w-full bg-ig-blue text-white py-3 rounded-md font-bold text-[14px]"
+              className="w-full bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
             >
               Simpan Perubahan
             </button>
             <button 
               onClick={onDelete}
-              className="w-full py-3 text-red-500 font-bold text-sm hover:bg-red-50 rounded-md flex items-center justify-center gap-2"
+              className="w-full py-4 text-red-500 font-black text-[11px] uppercase tracking-widest hover:bg-white/5 rounded-2xl flex items-center justify-center gap-2 transition-all"
             >
               <Trash2 size={16} />
               Hapus Profile
@@ -1432,66 +1509,66 @@ function ProfileFormModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
 
   return (
     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl border border-border-ig flex flex-col"
-      >
-        <div className="flex items-center gap-4 mb-8">
-           <div className="relative w-16 h-16 rounded-full border-2 border-dashed border-border-ig flex items-center justify-center overflow-hidden shrink-0">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <UserCircle size={32} className="text-ig-grey" />
-              )}
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute inset-0 bg-black/20 flex items-center justify-center text-white opacity-0 hover:opacity-100 transition-opacity"
-              >
-                <Plus size={20} />
-              </button>
-           </div>
-           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-           <div>
-              <h3 className="text-base font-bold">Profile Baru</h3>
-              <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider">Story Identity</p>
-           </div>
-        </div>
-        <div className="space-y-4 mb-8">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Nama Profile</label>
-            <input 
-              autoFocus
-              required
-              disabled={isSubmitting}
-              type="text" 
-              placeholder="Contoh: Site Masamba"
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-base font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-              value={name}
-              onChange={e => setName(e.target.value)}
-            />
+        <motion.div 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-white/20 flex flex-col"
+        >
+          <div className="flex items-center gap-4 mb-8">
+             <div className="relative w-16 h-16 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center overflow-hidden shrink-0">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <UserCircle size={32} className="text-white/20" />
+                )}
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 bg-black/20 flex items-center justify-center text-white opacity-0 hover:opacity-100 transition-opacity"
+                >
+                  <Plus size={20} />
+                </button>
+             </div>
+             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+             <div>
+                <h3 className="text-base font-black text-white">Profile Baru</h3>
+                <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest leading-none mt-1">Story Identity</p>
+             </div>
           </div>
-        </div>
-        <div className="flex gap-4">
-          <button 
-            onClick={onClose} 
-            disabled={isSubmitting}
-            className="flex-1 py-3 text-[12px] font-bold text-ig-grey hover:bg-bg-alt rounded-md transition-colors"
-          >
-            Batal
-          </button>
-          <button 
-            disabled={!name || isSubmitting}
-            onClick={() => {
-              setIsSubmitting(true);
-              onSubmit(name, avatarUrl);
-            }}
-            className="flex-1 py-3 bg-ig-blue text-white rounded-md text-[12px] font-bold shadow-lg shadow-ig-blue/20"
-          >
-            {isSubmitting ? 'Menyimpan...' : 'Tambah Profile'}
-          </button>
-        </div>
-      </motion.div>
+          <div className="space-y-4 mb-8">
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Nama Profile</label>
+              <input 
+                autoFocus
+                required
+                disabled={isSubmitting}
+                type="text" 
+                placeholder="Contoh: Site Masamba"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white focus:bg-white/10 outline-none transition-all"
+                value={name}
+                onChange={e => setName(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <button 
+              onClick={onClose} 
+              disabled={isSubmitting}
+              className="flex-1 py-4 text-[11px] font-black text-white/40 hover:text-white hover:bg-white/5 rounded-2xl transition-all uppercase tracking-widest"
+            >
+              Batal
+            </button>
+            <button 
+              disabled={!name || isSubmitting}
+              onClick={() => {
+                setIsSubmitting(true);
+                onSubmit(name, avatarUrl);
+              }}
+              className="flex-1 py-4 bg-white/90 backdrop-blur-md text-ig-blue rounded-2xl text-[11px] font-black shadow-xl uppercase tracking-widest active:scale-95 transition-all"
+            >
+              {isSubmitting ? 'Proses...' : 'Simpan'}
+            </button>
+          </div>
+        </motion.div>
     </div>
   );
 }
@@ -1501,53 +1578,53 @@ function SubFormModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (n
   const [isSubmitting, setIsSubmitting] = useState(false);
   return (
     <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl border border-border-ig flex flex-col"
-      >
-        <div className="flex items-center gap-4 mb-8">
-           <div className="w-12 h-12 bg-bg-alt border border-border-ig rounded-full flex items-center justify-center">
-              <MapPin size={24} className="text-ig-black" />
-           </div>
-           <div>
-              <h3 className="text-base font-bold">Sub Lokasi Baru</h3>
-              <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider">Node Proyek</p>
-           </div>
-        </div>
-        <div className="space-y-1 mb-8">
-          <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Nama Sub Lokasi</label>
-          <input 
-            autoFocus
-            required
-            disabled={isSubmitting}
-            type="text" 
-            placeholder="Contoh: BLOK A"
-            className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-base font-bold focus:ring-1 focus:ring-ig-blue outline-none shadow-sm"
-            value={name}
-            onChange={e => setName(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-4">
-          <button 
-            onClick={onClose} 
-            disabled={isSubmitting}
-            className="flex-1 py-3 text-[12px] font-bold text-ig-grey hover:bg-bg-alt rounded-md transition-colors"
-          >
-            Batal
-          </button>
-          <button 
-            disabled={!name || isSubmitting}
-            onClick={() => {
-              setIsSubmitting(true);
-              onSubmit(name);
-            }}
-            className="flex-1 py-3 bg-ig-blue text-white rounded-md text-[12px] font-bold shadow-lg shadow-ig-blue/20"
-          >
-            {isSubmitting ? 'Menyimpan...' : 'Tambah Sub'}
-          </button>
-        </div>
-      </motion.div>
+        <motion.div 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-white/20 flex flex-col"
+        >
+          <div className="flex items-center gap-4 mb-8">
+             <div className="w-12 h-12 bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center text-white">
+                <MapPin size={24} />
+             </div>
+             <div>
+                <h3 className="text-base font-black text-white">Sub Lokasi Baru</h3>
+                <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mt-1">Node Proyek</p>
+             </div>
+          </div>
+          <div className="space-y-1.5 mb-8">
+            <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Nama Sub Lokasi</label>
+            <input 
+              autoFocus
+              required
+              disabled={isSubmitting}
+              type="text" 
+              placeholder="Contoh: BLOK A"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 transition-all"
+              value={name}
+              onChange={e => setName(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-4">
+            <button 
+              onClick={onClose} 
+              disabled={isSubmitting}
+              className="flex-1 py-4 text-[11px] font-black text-white/40 hover:text-white/60 hover:bg-white/5 rounded-2xl transition-all uppercase tracking-widest"
+            >
+              Batal
+            </button>
+            <button 
+              disabled={!name || isSubmitting}
+              onClick={() => {
+                setIsSubmitting(true);
+                onSubmit(name);
+              }}
+              className="flex-1 py-4 bg-white/90 backdrop-blur-md text-ig-blue rounded-2xl text-[11px] font-black shadow-xl uppercase tracking-widest active:scale-95 transition-all"
+            >
+              {isSubmitting ? 'Proses...' : 'Tambah Sub'}
+            </button>
+          </div>
+        </motion.div>
     </div>
   );
 }
@@ -1561,64 +1638,68 @@ function ReceiveOrderModal({ onClose, request, onConfirm }: {
   const [deliverer, setDeliverer] = useState(DELIVERERS[0]);
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4 text-left">
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[250] flex items-center justify-center p-4 text-left">
       <motion.div 
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative border border-border-ig flex flex-col"
+        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/20 flex flex-col"
       >
         <div className="flex items-center justify-between mb-8">
-           <h3 className="text-base font-bold">Konfirmasi Paket</h3>
-           <button onClick={onClose} className="text-ig-grey">
+           <h3 className="text-base font-black text-white">Konfirmasi Paket</h3>
+           <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
              <X size={24} />
            </button>
         </div>
 
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-12 h-12 bg-green-500 text-white rounded-full flex items-center justify-center">
+          <div className="w-12 h-12 bg-green-500/80 backdrop-blur-md text-white rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/20">
             <CheckCircle2 size={24} strokeWidth={2.5} />
           </div>
           <div>
-            <h3 className="text-sm font-bold uppercase truncate max-w-[200px]">{request.materialName}</h3>
-            <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider">Penerimaan Terakhir</p>
+            <h3 className="text-sm font-black text-white uppercase truncate max-w-[200px]">{request.materialName}</h3>
+            <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mt-1">Penerimaan Terakhir</p>
           </div>
         </div>
 
-        <div className="space-y-6 mb-8">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Penerima</label>
-            <div className="relative">
-              <select 
-                className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none appearance-none"
-                value={recipient}
-                onChange={e => setRecipient(e.target.value)}
-              >
-                {RECIPIENTS.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
+          <div className="space-y-6 mb-8">
+            <div className="space-y-1.5 text-left">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Penerima</label>
+              <div className="relative">
+                <select 
+                  className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none appearance-none cursor-pointer"
+                  value={recipient}
+                  onChange={e => setRecipient(e.target.value)}
+                >
+                  {RECIPIENTS.map(r => <option key={r} value={r} className="text-black">{r}</option>)}
+                </select>
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Dikirim Oleh</label>
-            <div className="relative">
-              <select 
-                className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none appearance-none"
-                value={deliverer}
-                onChange={e => setDeliverer(e.target.value)}
-              >
-                {DELIVERERS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
+            <div className="space-y-1.5 text-left">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Dikirim Oleh</label>
+              <div className="relative">
+                <select 
+                  className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none appearance-none cursor-pointer"
+                  value={deliverer}
+                  onChange={e => setDeliverer(e.target.value)}
+                >
+                  {DELIVERERS.map(d => <option key={d} value={d} className="text-black">{d}</option>)}
+                </select>
+              </div>
             </div>
           </div>
-        </div>
 
         <button 
           onClick={() => onConfirm({ recipient, deliverer })}
-          className="w-full bg-ig-blue text-white py-4 rounded-md font-bold text-sm shadow-lg shadow-ig-blue/20 transition-all active:scale-95"
+          className="w-full bg-white/90 backdrop-blur-md text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all mb-4"
         >
           Konfirmasi Diterima
         </button>
+
+        <p className="text-[10px] text-center text-white/30 font-bold uppercase tracking-widest">
+          v1.2 • Digital Signature
+        </p>
       </motion.div>
     </div>
   );
@@ -1627,109 +1708,262 @@ function ReceiveOrderModal({ onClose, request, onConfirm }: {
 function FundsView({ subId }: { subId: string }) {
   const { fieldFunds = [], addFieldFundEntry, deleteFieldFundEntry } = useApp();
   const [showAdd, setShowAdd] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [viewingNota, setViewingNota] = useState<any>(null);
   
-  const subFunds = fieldFunds.filter(f => f.subId === subId);
+  const subFunds = fieldFunds.filter(f => f.subId === subId).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+  const lastNotaNo = subFunds.length > 0 ? subFunds[0].notaNo : '';
+
+  const toggleSelect = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const copyToSpreadsheet = () => {
+    const selectedEntries = subFunds.filter(f => selectedIds.includes(f.id));
+    if (selectedEntries.length === 0) return alert('Pilih nota yang ingin dicopy');
+
+    let tsv = '';
+    let globalNo = 1;
+
+    // Order by date ascending for copy
+    const sortedForCopy = [...selectedEntries].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+
+    sortedForCopy.forEach(nota => {
+      nota.items.forEach((item: any, idx: number) => {
+        // Format: No, Tanggal, Uraian (item), (Kosong), Uraian (Item lagi), Klasifikasi, (Kosong), Jumlah, Satuan, Harga Satuan
+        const row = [
+          globalNo++,
+          idx === 0 ? nota.tanggal : '', // Only first item of the nota gets the date
+          item.uraian, // Uraian (item)
+          '',          // (Kosong)
+          item.uraian, // Uraian (item lagi)
+          item.klasifikasi || 'BAHAN',
+          '',          // (Kosong)
+          item.jumlah,
+          item.satuan,
+          item.hargaSatuan
+        ];
+        tsv += row.join('\t') + '\n';
+      });
+    });
+
+    navigator.clipboard.writeText(tsv).then(() => {
+      alert('Data berhasil dicopy! Silahkan paste di Spreadsheet.');
+    });
+  };
+
+  const sendToWhatsApp = () => {
+    const selectedEntries = subFunds.filter(f => selectedIds.includes(f.id));
+    if (selectedEntries.length === 0) return alert('Pilih nota yang ingin dikirim');
+
+    let message = `*LAPORAN DANA LAPANGAN*\n`;
+    message += `Sub Lokasi: ${subId}\n`;
+    message += `--------------------------\n\n`;
+
+    selectedEntries.forEach((nota, idx) => {
+      message += `*${idx + 1}. Nota: ${nota.notaNo}* (${nota.tanggal})\n`;
+      nota.items.forEach((item: any) => {
+        message += `- ${item.uraian} (${item.klasifikasi}): ${item.jumlah} ${item.satuan} @ Rp ${item.hargaSatuan.toLocaleString()} = *Rp ${item.hargaTotal.toLocaleString()}*\n`;
+      });
+      message += `_Total Nota: Rp ${nota.totalNota.toLocaleString()}_\n\n`;
+    });
+    
+    const totalSemua = selectedEntries.reduce((acc, n) => acc + (n.totalNota || 0), 0);
+    message += `--------------------------\n`;
+    message += `*TOTAL KESELURUHAN: Rp ${totalSemua.toLocaleString()}*`;
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-bg-base overflow-hidden">
-      <div className="px-4 py-4 border-b border-border-ig flex items-center justify-between bg-bg-base sticky top-0 z-10 shadow-sm text-left">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-600">
+    <div className="flex-1 flex flex-col h-full bg-transparent overflow-hidden relative">
+
+      <div 
+        className="px-4 py-4 border-b border-white/10 flex items-center justify-between sticky top-0 z-10 text-left overflow-hidden bg-black/20 backdrop-blur-md"
+      >
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white">
             <Landmark size={22} />
           </div>
           <div>
-            <h2 className="text-sm font-bold tracking-tight">Dana Lapangan</h2>
-            <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest leading-none">Petty Cash Proyek</p>
+            <h2 className="text-sm font-black tracking-tight text-white uppercase">Dana Lapangan</h2>
+            <p className="text-[9px] text-white/60 font-black uppercase tracking-widest leading-none">Petty Cash Proyek</p>
           </div>
         </div>
-        <button 
-          onClick={() => {
-            if (!subId) return alert('Pilih sub lokasi terlebih dahulu');
-            setShowAdd(true);
-          }}
-          className="bg-ig-blue text-white w-9 h-9 rounded-lg flex items-center justify-center shadow-lg shadow-ig-blue/20 transition-all active:scale-90"
-        >
-          <Plus size={22} strokeWidth={3} />
-        </button>
+        <div className="flex items-center gap-2">
+          {selectedIds.length > 0 && (
+            <>
+              <button 
+                onClick={sendToWhatsApp}
+                className="bg-[#25D366] text-white w-9 h-9 rounded-xl flex items-center justify-center shadow-lg shadow-green-500/20 hover:opacity-80 transition-all active:scale-90"
+                title="Kirim WA"
+              >
+                <MessageCircle size={18} fill="currentColor" />
+              </button>
+              <button 
+                onClick={copyToSpreadsheet}
+                className="bg-white/10 border border-white/20 text-white w-9 h-9 rounded-xl flex items-center justify-center shadow-lg hover:bg-white/20 transition-all active:scale-90"
+                title="Copy ke Spreadsheet"
+              >
+                <Table size={18} />
+              </button>
+            </>
+          )}
+          <button 
+            onClick={() => {
+              if (!subId) return alert('Pilih sub lokasi terlebih dahulu');
+              setShowAdd(true);
+            }}
+            className="bg-white/90 backdrop-blur-md text-ig-blue w-9 h-9 rounded-xl flex items-center justify-center shadow-xl transition-all active:scale-90"
+          >
+            <Plus size={22} strokeWidth={4} />
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar pb-24">
+      <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar pb-24 text-left relative z-10">
         {subFunds.length === 0 ? (
-          <div className="p-20 text-center opacity-30 flex flex-col items-center">
+          <div className="p-20 text-center text-white/30 flex flex-col items-center">
             <Wallet size={48} className="mb-4" strokeWidth={1} />
             <p className="text-xs font-bold uppercase tracking-widest">Belum ada input dana</p>
           </div>
         ) : (
-          <div className="min-w-[1200px] p-4 text-left">
-            <table className="w-full border-collapse bg-white rounded-xl overflow-hidden shadow-sm border border-border-ig">
-              <thead>
-                <tr className="bg-bg-alt text-[9px] font-bold text-ig-grey uppercase tracking-widest text-left">
-                  <th className="p-3 border-b border-border-ig">NO NOTA</th>
-                  <th className="p-3 border-b border-border-ig">TANGGAL</th>
-                  <th className="p-3 border-b border-border-ig">ITEM PEMBELIAN</th>
-                  <th className="p-3 border-b border-border-ig">KLASIFIKASI</th>
-                  <th className="p-3 border-b border-border-ig">QTY</th>
-                  <th className="p-3 border-b border-border-ig">SAT</th>
-                  <th className="p-3 border-b border-border-ig">HARGA SATUAN</th>
-                  <th className="p-3 border-b border-border-ig">TOTAL</th>
-                  <th className="p-3 border-b border-border-ig">TOTAL NOTA</th>
-                  <th className="p-3 border-b border-border-ig">AKSI</th>
-                </tr>
-              </thead>
-              <tbody className="text-[11px] font-medium text-ig-black divide-y divide-gray-50 text-left">
-                {subFunds.map((nota) => (
-                  <React.Fragment key={nota.id}>
-                    {(nota.items || []).map((item: any, idx: number) => (
-                      <tr key={`${nota.id}-${idx}`} className="hover:bg-bg-alt/30 transition-colors">
-                        {idx === 0 && (
-                          <td rowSpan={nota.items.length} className="p-3 font-bold border-r border-border-ig bg-bg-alt/10 align-top">
-                            {nota.notaNo}
-                          </td>
-                        )}
-                        {idx === 0 && (
-                          <td rowSpan={nota.items.length} className="p-3 font-bold border-r border-border-ig align-top">
-                            {nota.tanggal}
-                          </td>
-                        )}
-                        <td className="p-3 max-w-[200px] truncate font-bold">{item.uraian}</td>
-                        <td className="p-3">
-                          <span className="px-1.5 py-0.5 rounded-[4px] bg-ig-black/5 text-[8px] font-black uppercase">
-                            {item.klasifikasi || 'BAHAN'}
-                          </span>
-                        </td>
-                        <td className="p-3">{item.jumlah}</td>
-                        <td className="p-3">{item.satuan}</td>
-                        <td className="p-3">{(item.hargaSatuan || 0).toLocaleString()}</td>
-                        <td className="p-3 font-bold">{(item.hargaTotal || 0).toLocaleString()}</td>
-                        {idx === 0 && (
-                          <td rowSpan={nota.items.length} className="p-3 text-ig-blue font-black bg-ig-blue/5 text-sm border-l border-border-ig align-top">
-                            {(nota.totalNota || 0).toLocaleString()}
-                          </td>
-                        )}
-                        {idx === 0 && (
-                          <td rowSpan={nota.items.length} className="p-3 border-l border-border-ig align-top">
-                            <button 
-                              onClick={() => deleteFieldFundEntry(nota.id)}
-                              className="p-1.5 text-red-300 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-4">
+            <div className="bg-transparent rounded-[32px] overflow-hidden border border-white/10 shadow-2xl">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-transparent border-b border-white/10 text-[9px] font-black text-white/40 uppercase tracking-widest text-left">
+                    <th className="p-4 w-10 text-center">
+                       <Circle size={12} className="opacity-30 mx-auto" strokeWidth={3} />
+                    </th>
+                    <th className="p-4">NO NOTA</th>
+                    <th className="p-4">ITEM PEMBELIAN</th>
+                  </tr>
+                </thead>
+                <tbody className="text-[12px] font-black text-white divide-y divide-white/5">
+                  {subFunds.map((nota) => (
+                    <tr 
+                      key={nota.id} 
+                      onClick={() => setViewingNota(nota)}
+                      className={`hover:bg-white/10 transition-all cursor-pointer group ${selectedIds.includes(nota.id) ? 'bg-white/10' : ''}`}
+                    >
+                      <td className="p-4 text-center">
+                         <button 
+                          onClick={(e) => toggleSelect(nota.id, e)}
+                          className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                            selectedIds.includes(nota.id) 
+                            ? 'bg-white border-white text-ig-blue shadow-lg' 
+                            : 'bg-transparent border-white/20 text-transparent group-hover:border-white/50'
+                          }`}
+                         >
+                           <Check size={14} strokeWidth={4} />
+                         </button>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col">
+                          <span className="font-black text-white">#{nota.notaNo}</span>
+                          <span className="text-[9px] text-white/50 uppercase tracking-widest mt-0.5">{nota.tanggal}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="truncate max-w-[150px] sm:max-w-xs">{nota.items.map((i: any) => i.uraian).join(', ')}</span>
+                          <span className="text-[10px] font-black text-white/60 italic">RP {(nota.totalNota || 0).toLocaleString()}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       <AnimatePresence>
+        {viewingNota && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 text-left" onClick={() => setViewingNota(null)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white/10 backdrop-blur-xl w-full max-w-md rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col border border-white/20"
+            >
+              <div className="bg-white/5 p-8 pb-12 relative overflow-hidden border-b border-white/10">
+                <Landmark size={120} className="absolute -right-10 -bottom-10 text-white/10 -rotate-12 pointer-events-none" />
+                <div className="relative z-10 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-black text-white leading-none tracking-tight">Detail Nota</h3>
+                    <p className="text-[10px] font-black text-white/80 uppercase tracking-[0.2em] mt-2">Doodle Dana Report</p>
+                  </div>
+                  <button onClick={() => setViewingNota(null)} className="w-10 h-10 rounded-2xl bg-white/20 border border-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all"><X size={24} /></button>
+                </div>
+              </div>
+
+              <div className="px-8 -mt-6 relative z-20">
+                <div className="bg-white/5 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/20 p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">No. Nota</p>
+                      <p className="text-sm font-black text-white">#{viewingNota.notaNo}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Tanggal</p>
+                      <p className="text-sm font-black text-white/90">{viewingNota.tanggal}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <p className="text-[9px] font-black text-white/50 uppercase tracking-widest border-b border-white/10 pb-2">Rincian Item</p>
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                       {viewingNota.items.map((item: any, idx: number) => (
+                         <div key={idx} className="flex flex-col gap-1.5 border-b border-white/5 pb-3 last:border-0">
+                           <div className="flex items-center justify-between">
+                             <span className="text-xs font-black text-white">{item.uraian}</span>
+                             <span className="text-[8px] font-black px-2 py-0.5 rounded-lg bg-white/10 text-white/70 uppercase tracking-wider">{item.klasifikasi || 'BAHAN'}</span>
+                           </div>
+                           <div className="flex items-center justify-between text-[11px] font-bold text-white/50">
+                             <span className="opacity-60">{item.jumlah} {item.satuan} @ {item.hargaSatuan.toLocaleString()}</span>
+                             <span className="text-white font-black italic">RP {item.hargaTotal.toLocaleString()}</span>
+                           </div>
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t-2 border-dashed border-white/10">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-black text-white/50 uppercase tracking-widest">Total Bayar</p>
+                      <p className="text-xl font-black text-white italic">RP {viewingNota.totalNota.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      if (confirm('Hapus rincian nota ini?')) {
+                        deleteFieldFundEntry(viewingNota.id);
+                        setViewingNota(null);
+                      }
+                    }}
+                    className="w-full py-4 text-[10px] font-black text-red-400 hover:text-red-300 uppercase tracking-[0.2em] hover:bg-white/5 transition-all rounded-2xl flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={16} /> Hapus Selamanya
+                  </button>
+                </div>
+              </div>
+              <div className="h-8" />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showAdd && (
           <FundEntryModal 
             subId={subId}
+            lastNotaNo={lastNotaNo}
             onClose={() => setShowAdd(false)}
             onSubmit={(entry: any) => {
               addFieldFundEntry(entry);
@@ -1752,17 +1986,17 @@ function ProfileManagementView({
 }: any) {
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-bg-alt overflow-hidden pt-4">
+    <div className="flex-1 flex flex-col h-full bg-transparent overflow-hidden pt-4 relative">
       <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-24 text-left">
         <div className="grid grid-cols-3 gap-6">
           <button 
             onClick={() => setShowAddProfile(true)}
             className="flex flex-col items-center gap-3 active:scale-95 transition-transform"
           >
-            <div className="w-20 h-20 rounded-full border-2 border-dashed border-border-ig flex items-center justify-center text-ig-grey hover:text-ig-blue hover:border-ig-blue transition-all bg-white shadow-sm">
+            <div className="w-20 h-20 rounded-3xl border-2 border-dashed border-white/20 flex items-center justify-center text-white/20 hover:text-white hover:border-white/40 transition-all bg-white/5 shadow-xl backdrop-blur-md">
               <Plus size={32} />
             </div>
-            <span className="text-[10px] font-bold text-ig-grey uppercase">Tambah</span>
+            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Tambah</span>
           </button>
           
           {profiles.map((prof: any) => (
@@ -1772,18 +2006,18 @@ function ProfileManagementView({
               className="flex flex-col items-center gap-3 relative group active:scale-95 transition-all"
             >
               <div className={`w-20 h-20 rounded-3xl p-1 border-2 transition-all overflow-hidden ${
-                activeProfileId === prof.id ? 'border-ig-blue shadow-lg shadow-ig-blue/20 rotate-3' : 'border-white bg-white shadow-sm'
+                activeProfileId === prof.id ? 'border-white shadow-2xl shadow-white/20 rotate-3' : 'border-white/10 bg-white/5 shadow-sm'
               }`}>
-                <div className="w-full h-full rounded-2xl overflow-hidden flex items-center justify-center bg-bg-alt">
+                <div className="w-full h-full rounded-2xl overflow-hidden flex items-center justify-center bg-white/5">
                   {getProfileAvatar(prof)}
                 </div>
               </div>
-              <span className={`text-[11px] font-bold tracking-tight truncate w-24 text-center ${
-                activeProfileId === prof.id ? 'text-ig-black' : 'text-ig-grey'
+              <span className={`text-[11px] font-black tracking-tight truncate w-24 text-center uppercase tracking-widest ${
+                activeProfileId === prof.id ? 'text-white' : 'text-white/40'
               }`}>{prof.name}</span>
               
               {activeProfileId === prof.id && (
-                <div className="absolute top-0 right-0 -mr-1 -mt-1 w-6 h-6 bg-ig-blue text-white rounded-full flex items-center justify-center shadow-md animate-bounce">
+                <div className="absolute top-0 right-0 -mr-1 -mt-1 w-6 h-6 bg-white text-ig-blue rounded-full flex items-center justify-center shadow-md animate-bounce">
                   <CheckCircle2 size={14} strokeWidth={3} />
                 </div>
               )}
@@ -1794,7 +2028,7 @@ function ProfileManagementView({
         {activeProfileId && (
           <div className="mt-8 flex flex-col items-center gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-white border border-border-ig flex items-center justify-center text-ig-grey">
+              <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-white/40">
                 <Settings size={20} />
               </div>
               <button 
@@ -1819,32 +2053,37 @@ function ProfileSelectionModal({ profiles, onSelect, onAdd, getProfileAvatar }: 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/60 backdrop-blur-md"
-      />
+        className="absolute inset-0 bg-black/80 overflow-hidden"
+      >
+        <div 
+          className="absolute inset-0 bg-transparent opacity-40 scale-105"
+        />
+        <div className="absolute inset-0 backdrop-blur-md bg-black/40" />
+      </motion.div>
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="relative bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]"
+        className="relative bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col max-h-[80vh] border border-white/20"
       >
-        <div className="px-8 py-8 border-b border-border-ig bg-white text-center">
-          <h2 className="text-2xl font-black tracking-tight mb-2">Renovki Konstruksi</h2>
-          <p className="text-xs font-bold text-ig-grey uppercase tracking-widest">Pilih Lokasi Proyek</p>
+        <div className="px-8 py-8 border-b border-white/10 bg-white/5 text-center">
+          <h2 className="text-2xl font-black tracking-tight mb-1 text-white leading-none">Renovki Konstruksi</h2>
+          <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">Pilih Lokasi Proyek</p>
         </div>
         
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           {profiles.length === 0 ? (
             <div className="text-center py-8">
-               <div className="w-20 h-20 rounded-full border border-border-ig flex items-center justify-center mx-auto mb-6 text-ig-grey opacity-40">
+               <div className="w-20 h-20 rounded-full border border-white/10 flex items-center justify-center mx-auto mb-6 text-white/20">
                   <MapPin size={32} />
                </div>
-               <h3 className="text-base font-bold mb-2">Belum Ada Lokasi</h3>
-               <p className="text-ig-grey text-xs mb-8">Tambahkan lokasi proyek pertama Anda untuk mulai mengelola</p>
+               <h3 className="text-base font-bold mb-2 text-white">Belum Ada Lokasi</h3>
+               <p className="text-white/40 text-[11px] mb-8 font-medium">Tambahkan lokasi proyek pertama Anda untuk mulai mengelola</p>
                <button 
                 onClick={onAdd}
-                className="w-full bg-ig-blue text-white py-4 rounded-2xl font-black text-sm shadow-lg shadow-ig-blue/20 flex items-center justify-center gap-3 transition-transform active:scale-95"
+                className="w-full bg-white text-ig-blue py-4 rounded-2xl font-black text-sm shadow-xl flex items-center justify-center gap-3 transition-transform active:scale-95"
                >
-                 <Plus size={20} strokeWidth={3} />
+                 <Plus size={20} strokeWidth={4} />
                  TAMBAH LOKASI
                </button>
             </div>
@@ -1856,43 +2095,48 @@ function ProfileSelectionModal({ profiles, onSelect, onAdd, getProfileAvatar }: 
                   onClick={() => onSelect(prof.id)}
                   className="flex flex-col items-center gap-3 active:scale-95 transition-all text-center group"
                 >
-                  <div className="w-24 h-24 rounded-3xl overflow-hidden flex items-center justify-center bg-bg-alt border border-border-ig shadow-sm group-hover:ring-4 group-hover:ring-ig-blue/10 transition-all">
+                  <div className="w-24 h-24 rounded-3xl overflow-hidden flex items-center justify-center bg-white/5 border border-white/10 shadow-lg group-hover:scale-105 transition-all">
                     {getProfileAvatar(prof)}
                   </div>
-                  <span className="text-[11px] font-black uppercase tracking-widest truncate w-full text-ig-black">{prof.name}</span>
+                  <span className="text-[11px] font-black uppercase tracking-widest truncate w-full text-white">{prof.name}</span>
                 </button>
               ))}
               <button 
                 onClick={onAdd}
                 className="flex flex-col items-center gap-3 active:scale-95 transition-all group"
               >
-                <div className="w-24 h-24 rounded-3xl flex items-center justify-center border-2 border-dashed border-border-ig bg-transparent text-ig-grey hover:text-ig-blue hover:border-ig-blue/50 transition-all">
+                <div className="w-24 h-24 rounded-3xl flex items-center justify-center border-2 border-dashed border-white/10 bg-transparent text-white/20 hover:text-white/40 transition-all">
                   <Plus size={32} />
                 </div>
-                <span className="text-[11px] font-bold text-ig-grey uppercase tracking-widest">Baru</span>
+                <span className="text-[11px] font-bold text-white/40 uppercase tracking-widest">Baru</span>
               </button>
             </div>
           )}
         </div>
         
-        <div className="p-6 bg-bg-alt/30 border-t border-border-ig text-center">
-            <p className="text-[9px] font-bold text-ig-grey uppercase tracking-[0.2em]">Selamat Bekerja, Site Manager!</p>
+        <div className="p-6 bg-white/5 border-t border-white/10 text-center backdrop-blur-md">
+            <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em]">Selamat Bekerja, Site Manager!</p>
         </div>
       </motion.div>
     </div>
   );
 }
 
-function FundEntryModal({ subId, onClose, onSubmit }: any) {
-  const [notaParts, setNotaParts] = useState({
-    series: '',
-    input: '',
-    number: ''
-  });
+function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
   const [form, setForm] = useState({
     subId,
     tanggal: new Date().toISOString().split('T')[0],
-    notaNo: '',
+    notaNo: (() => {
+      if (!lastNotaNo) return '1';
+      const match = lastNotaNo.match(/^(\D*)(\d+)$/);
+      if (match) {
+        const prefix = match[1];
+        const numPart = match[2];
+        const incremented = (parseInt(numPart) + 1).toString();
+        return prefix + incremented.padStart(numPart.length, '0');
+      }
+      return lastNotaNo + '-1';
+    })(),
     items: [{
       uraian: '',
       klasifikasi: 'BAHAN',
@@ -1928,19 +2172,21 @@ function FundEntryModal({ subId, onClose, onSubmit }: any) {
 
   const updateItem = (idx: number, field: string, val: any) => {
     const newItems = [...form.items];
-    (newItems[idx] as any)[field] = val;
+    const item = newItems[idx];
+    (item as any)[field] = val;
     
-    // Logic: Free to edit either but try to assist
-    if (field === 'jumlah' || field === 'hargaSatuan') {
-      const item = newItems[idx];
-      if (item.jumlah && item.hargaSatuan) {
-        item.hargaTotal = item.jumlah * item.hargaSatuan;
+    // Logic: Always keep Harga Satuan updated if it's derived from Total and Qty
+    // This handles both order of entry: Total first or Qty first
+    const qty = parseFloat(item.jumlah as any) || 0;
+    const total = parseFloat(item.hargaTotal as any) || 0;
+    
+    if (qty > 0) {
+      if (field === 'hargaTotal' || field === 'jumlah') {
+        // Round to 2 decimals to prevent long floating point issues that look like millions in some locales
+        item.hargaSatuan = Math.round((total / qty) * 100) / 100;
       }
-    } else if (field === 'hargaTotal') {
-      const item = newItems[idx];
-      if (item.jumlah && item.hargaTotal) {
-        item.hargaSatuan = item.hargaTotal / item.jumlah;
-      }
+    } else {
+      item.hargaSatuan = 0;
     }
 
     const newTotal = newItems.reduce((acc, item) => acc + (item.hargaTotal || 0), 0);
@@ -1948,184 +2194,182 @@ function FundEntryModal({ subId, onClose, onSubmit }: any) {
   };
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[250] flex items-center justify-center p-4">
       <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-bg-base w-full max-w-2xl rounded-[32px] p-8 shadow-2xl relative border border-border-ig max-h-[90vh] overflow-y-auto custom-scrollbar text-left"
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[40px] shadow-2xl relative border border-white/20 max-h-[90vh] overflow-hidden flex flex-col"
       >
-        <div className="flex items-center justify-between mb-8 sticky top-0 bg-bg-base z-10 pb-4">
+        <div className="px-8 pt-8 pb-4 relative z-10 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold">Input Dana Lapangan (Nota)</h3>
-            <p className="text-[10px] text-ig-grey font-bold uppercase tracking-widest mt-0.5">Satu nota untuk banyak item</p>
+            <h3 className="text-xl font-black text-white tracking-tight leading-none">Petty Cash</h3>
+            <p className="text-[9px] text-white/60 font-black uppercase tracking-[0.2em] mt-1">Laporan Dana Lapangan</p>
           </div>
-          <button onClick={onClose} className="text-ig-grey"><X size={24} /></button>
+          <button 
+            onClick={onClose} 
+            className="w-10 h-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <form onSubmit={(e) => {
           e.preventDefault();
-          const fullNota = `${notaParts.series}${notaParts.input}${notaParts.number}`.trim();
-          onSubmit({ ...form, notaNo: fullNota || 'Tanpa Nomor' });
-        }} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-bg-alt p-6 rounded-2xl border border-border-ig">
+          const validItems = form.items.filter(item => item.uraian.trim() !== '');
+          if (validItems.length === 0) return alert('Isi minimal 1 item');
+          onSubmit({ ...form, items: validItems });
+        }} className="flex-1 flex flex-col min-h-0 relative z-10">
+          
+          <div className="px-8 pb-6 space-y-4 overflow-y-auto custom-scrollbar pt-2 pb-20">
+            {/* Header Inputs Section */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">No. Nota</label>
+                <input 
+                  required
+                  type="text" 
+                  className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white placeholder:text-white/30 focus:bg-white/10 outline-none transition-all"
+                  value={form.notaNo}
+                  onChange={e => setForm({...form, notaNo: e.target.value})}
+                  placeholder="000"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Tanggal</label>
+                <input 
+                  required
+                  type="date" 
+                  className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all color-scheme-dark"
+                  value={form.tanggal}
+                  onChange={e => setForm({...form, tanggal: e.target.value})}
+                />
+              </div>
+            </div>
+
+            {/* Items List Section */}
             <div className="space-y-4">
-               <div>
-                 <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1 mb-2 block">No. Nota (Header)</label>
-                 <div className="flex items-center gap-1">
-                    <input 
-                      type="text" 
-                      className="w-16 bg-white border border-border-ig rounded-lg px-2 py-2 text-[10px] font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-                      value={notaParts.series}
-                      onChange={e => setNotaParts({...notaParts, series: e.target.value})}
-                      placeholder="Series"
-                    />
-                    <input 
-                      type="text" 
-                      className="flex-1 bg-white border border-border-ig rounded-lg px-3 py-2 text-xs font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-                      value={notaParts.input}
-                      onChange={e => setNotaParts({...notaParts, input: e.target.value})}
-                      placeholder="Input"
-                    />
-                    <input 
-                      type="text" 
-                      className="w-20 bg-white border border-border-ig rounded-lg px-2 py-2 text-[10px] font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-                      value={notaParts.number}
-                      onChange={e => setNotaParts({...notaParts, number: e.target.value})}
-                      placeholder="Nota"
-                    />
-                 </div>
-               </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1 mb-2 block">Tanggal</label>
-              <input 
-                required
-                type="date" 
-                className="w-full bg-white border border-border-ig rounded-xl px-4 py-3 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none"
-                value={form.tanggal}
-                onChange={e => setForm({...form, tanggal: e.target.value})}
-              />
-            </div>
-          </div>
+              <div className="flex items-center justify-between px-1">
+                <p className="text-[9px] font-black text-white uppercase tracking-widest">Daftar Item</p>
+                <button 
+                  type="button"
+                  onClick={addItem}
+                  className="flex items-center gap-1.5 text-[8px] font-black text-white uppercase tracking-widest bg-white/10 px-3 py-2 rounded-xl border border-white/20 hover:bg-white/20 transition-all active:scale-95"
+                >
+                  <Plus size={12} strokeWidth={4} /> Tambah
+                </button>
+              </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold text-ig-blue uppercase tracking-widest">Daftar Item Pembelian</p>
-              <button 
-                type="button"
-                onClick={addItem}
-                className="text-[10px] font-bold text-ig-blue uppercase tracking-widest flex items-center gap-1 hover:opacity-70 transition-opacity"
-              >
-                <Plus size={14} /> Tambah Item
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {form.items.map((item, idx) => (
-                <div key={idx} className="p-4 bg-white border border-border-ig rounded-2xl relative group">
-                  {form.items.length > 1 && (
-                    <button 
-                      type="button"
-                      onClick={() => removeItem(idx)}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                  
-                  <div className="grid grid-cols-6 gap-3 mb-3">
-                    <div className="col-span-3 space-y-1">
-                      <label className="text-[9px] font-bold text-ig-grey uppercase">Uraian</label>
-                      <input 
-                        type="text" 
-                        required
-                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none" 
-                        value={item.uraian}
-                        onChange={e => updateItem(idx, 'uraian', e.target.value)}
-                        placeholder="Contoh: Semen Gresik"
-                      />
-                    </div>
-                    <div className="col-span-3 space-y-1">
-                      <label className="text-[9px] font-bold text-ig-grey uppercase">Klasifikasi</label>
-                      <select 
-                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none appearance-none"
-                        value={item.klasifikasi}
-                        onChange={e => updateItem(idx, 'klasifikasi', e.target.value)}
+              <div className="space-y-6">
+                {form.items.map((item, idx) => (
+                  <div key={idx} className="p-6 bg-transparent border border-white/20 rounded-[32px] relative shadow-lg">
+                    {form.items.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => removeItem(idx)}
+                        className="absolute -top-1 -right-1 w-7 h-7 bg-white/10 text-white rounded-xl flex items-center justify-center border border-white/20 shadow-md active:scale-90 transition-all hover:bg-red-500"
                       >
-                        <option value="BAHAN">BAHAN</option>
-                        <option value="ALAT">ALAT</option>
-                        <option value="JASA">JASA</option>
-                      </select>
-                    </div>
-                  </div>
+                        <Trash2 size={14} />
+                      </button>
+                    )}
 
-                  <div className="grid grid-cols-4 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-ig-grey uppercase">Jumlah</label>
-                      <input 
-                        type="number" 
-                        required
-                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none" 
-                        value={item.jumlah}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value) || 0;
-                          updateItem(idx, 'jumlah', val);
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-ig-grey uppercase">Satuan</label>
-                      <input 
-                        type="text" 
-                        required
-                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none" 
-                        value={item.satuan}
-                        onChange={e => updateItem(idx, 'satuan', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-ig-grey uppercase">Harga Satuan</label>
-                      <input 
-                        type="number" 
-                        required
-                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-bold outline-none" 
-                        value={item.hargaSatuan}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value) || 0;
-                          updateItem(idx, 'hargaSatuan', val);
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-ig-grey uppercase text-ig-blue">Harga Total</label>
-                      <input 
-                        type="number" 
-                        required
-                        className="w-full bg-bg-alt px-3 py-2 rounded-lg text-xs font-black outline-none border border-ig-blue/30 text-ig-blue" 
-                        value={item.hargaTotal}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value) || 0;
-                          updateItem(idx, 'hargaTotal', val);
-                        }}
-                      />
+                    <div className="space-y-4">
+                      {/* Slim Single Column Vertical Inputs as requested */}
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-white/60 uppercase tracking-widest ml-1">Uraian</label>
+                        <input 
+                          type="text" 
+                          required
+                          className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-xs font-black text-white outline-none transition-all" 
+                          value={item.uraian}
+                          onChange={e => updateItem(idx, 'uraian', e.target.value)}
+                          placeholder="Nama Barang..."
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-white/60 uppercase tracking-widest ml-1">Klasifikasi</label>
+                        <div className="flex gap-2">
+                          {['BAHAN', 'ALAT', 'JASA'].map((k) => (
+                            <button
+                              key={k}
+                              type="button"
+                              onClick={() => updateItem(idx, 'klasifikasi', k)}
+                              className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all border ${
+                               item.klasifikasi === k 
+                               ? 'bg-white text-ig-blue border-white shadow-lg' 
+                               : 'bg-transparent text-white border-white/20 hover:bg-white/10'
+                             }`}
+                            >
+                              {k}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black text-white/60 uppercase tracking-widest ml-1">Satuan</label>
+                          <input 
+                            type="text" 
+                            required
+                            className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none" 
+                            value={item.satuan}
+                            onChange={e => updateItem(idx, 'satuan', e.target.value)}
+                            placeholder="ZAK/KG/LTR"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black text-white/60 uppercase tracking-widest ml-1">Volume</label>
+                          <input 
+                            type="number" 
+                            required
+                            className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none" 
+                            value={item.jumlah === 0 ? '' : item.jumlah}
+                            onChange={e => updateItem(idx, 'jumlah', parseFloat(e.target.value) || 0)}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-white uppercase tracking-widest ml-1">Total Bayar (RP)</label>
+                        <input 
+                          type="number" 
+                          required
+                          className="w-full bg-transparent border border-white/20 p-4 rounded-2xl text-sm font-black text-white outline-none shadow-xl transition-all active:scale-95 placeholder:text-white/30" 
+                          value={item.hargaTotal === 0 ? '' : item.hargaTotal}
+                          onChange={e => updateItem(idx, 'hargaTotal', parseFloat(e.target.value) || 0)}
+                          placeholder="RP 0"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between px-2 text-[9px] font-black text-white/80 italic">
+                        <span>Hrg Satuan</span>
+                        <span>RP {item.hargaSatuan.toLocaleString('id-ID', { maximumFractionDigits: 2 })}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-border-ig flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold text-ig-grey uppercase tracking-widest">Total Keseluruhan Nota</p>
-              <h4 className="text-xl font-black text-ig-blue">Rp {form.totalNota.toLocaleString()}</h4>
-            </div>
-            <button 
+          <div className="p-8 bg-white/10 backdrop-blur-xl border-t border-white/20 flex flex-col gap-4 mt-auto">
+             <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                   <p className="text-[9px] font-black text-white/70 uppercase tracking-widest leading-none">Ringkasan Total</p>
+                   <p className="text-2xl font-black italic text-white leading-none">RP {form.totalNota.toLocaleString()}</p>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white/90 backdrop-blur-md flex items-center justify-center text-ig-blue shadow-lg">
+                   <CheckCircle2 size={24} />
+                </div>
+             </div>
+             <button 
               type="submit"
-              className="bg-ig-blue text-white px-8 py-4 rounded-2xl font-bold text-sm shadow-xl shadow-ig-blue/20 transition-all active:scale-95"
-            >
-              Simpan Nota
-            </button>
+              className="w-full bg-white/90 backdrop-blur-md text-ig-blue py-4 rounded-2xl font-black text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3"
+             >
+               <Send size={18} fill="currentColor" /> SIMPAN TRANSAKSI
+             </button>
           </div>
         </form>
       </motion.div>

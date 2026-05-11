@@ -20,7 +20,7 @@
 
 @layer utilities {
   .ig-card {
-    @apply bg-bg-base border border-border-ig rounded-lg shadow-sm;
+    @apply bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-xl;
   }
 
   .ig-post-shadow {

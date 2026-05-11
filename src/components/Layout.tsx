@@ -66,49 +66,58 @@ export default function Layout() {
   }, [showNotifications, role, notifications.length]);
 
   return (
-    <div className="min-h-screen bg-bg-base font-sans text-ig-black flex flex-col lg:flex-row h-[100dvh] overflow-hidden">
+    <div className="min-h-screen bg-black font-sans text-white flex flex-col lg:flex-row h-[100dvh] overflow-hidden">
       
       <AnimatePresence mode="popLayout">
         {role === null ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-bg-base">
+          <div className="flex-1 flex flex-col items-center justify-center p-8 relative overflow-hidden bg-ig-black">
+            {/* Background Image with Overlay */}
+            <div 
+              className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+              style={{ backgroundImage: 'url("https://4kwallpapers.com/images/walls/thumbs_3t/26286.jpg")' }}
+            />
+            <div className="absolute inset-0 z-0 bg-black/60 backdrop-blur-[2px]" />
+            
             <motion.div
               key="role-selection"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              className="w-full max-w-[350px] flex flex-col items-center"
+              className="w-full max-w-[380px] flex flex-col items-center relative z-10"
             >
-              <div className="mb-12 flex flex-col items-center">
-                <h1 className="text-4xl font-light tracking-tight mb-2 italic">Renovki Dashboard</h1>
+              <div className="mb-12 flex flex-col items-center text-center">
+                <h1 className="text-4xl font-light tracking-tight mb-2 italic text-white drop-shadow-lg">Renovki Dashboard</h1>
+                <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.3em]">Smart Construction Management</p>
               </div>
 
-              <div className="w-full space-y-3">
-                <h2 className="text-[11px] font-bold text-ig-grey uppercase ml-1 mb-4 opacity-50 tracking-wider">Saved Accounts</h2>
+              <div className="w-full space-y-4 bg-white/5 backdrop-blur-3xl p-6 rounded-[32px] border border-white/10 shadow-2xl">
+                <h2 className="text-[10px] font-black text-white/40 uppercase ml-1 mb-2 tracking-[0.3em] leading-none">Pilih Divisi</h2>
                 
                 <RoleAccount 
                   name="Divisi Konstruksi" 
-                  role="Operation"
-                  icon={<HardHat size={22} className="text-white" />}
+                  role=""
+                  icon={<HardHat size={64} className="text-white/10 absolute -right-4 -bottom-4 -rotate-12" />}
                   onClick={() => setRole('SM')}
-                  gradient="bg-gradient-to-br from-blue-400 to-blue-600"
+                  gradient="bg-white/5 hover:bg-white/10"
                 />
                 <RoleAccount 
                   name="Divisi SCM" 
-                  role="Supply Chain"
-                  icon={<Truck size={22} className="text-white" />}
+                  role=""
+                  icon={<Truck size={64} className="text-white/10 absolute -right-4 -bottom-4 -rotate-12" />}
                   onClick={() => setRole('SCM')}
-                  gradient="bg-gradient-to-br from-green-400 to-green-600"
+                  gradient="bg-white/5 hover:bg-white/10"
                 />
                 <RoleAccount 
                   name="Divisi Finance" 
-                  role="Financial Ledger"
-                  icon={<Wallet size={22} className="text-white" />}
+                  role=""
+                  icon={<Wallet size={64} className="text-white/10 absolute -right-4 -bottom-4 -rotate-12" />}
                   onClick={() => setRole('FINANCE')}
-                  gradient="bg-gradient-to-br from-yellow-400 to-orange-500"
+                  gradient="bg-white/5 hover:bg-white/10"
                 />
               </div>
 
-              <div className="mt-12 text-center">
+              <div className="mt-12 text-center text-white/30 text-[10px] font-bold uppercase tracking-widest">
+                v2.0 • Proyek Management App
               </div>
             </motion.div>
           </div>
@@ -152,9 +161,17 @@ export default function Layout() {
               </div>
             </nav>
 
-            <div className="flex-1 flex flex-col relative h-full overflow-hidden bg-bg-base">
+            <div className="flex-1 flex flex-col relative h-full overflow-hidden bg-ig-black">
+              {/* Global Background Image with Overlay */}
+              <div 
+                className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: 'url("https://4kwallpapers.com/images/walls/thumbs_3t/26286.jpg")' }}
+              />
+              <div className="absolute inset-0 z-0 bg-black/40 backdrop-blur-[2px]" />
+              
+              <div className="flex-1 flex flex-col relative h-full overflow-hidden bg-transparent z-10">
               {/* Mobile Mobile Header */}
-              <header className="lg:hidden h-[60px] border-b border-border-ig flex items-center justify-between px-4 shrink-0 sticky top-0 bg-bg-base z-30">
+              <header className="lg:hidden h-[60px] border-b border-white/10 flex items-center justify-between px-4 shrink-0 sticky top-0 bg-white/10 backdrop-blur-md z-30">
                 <div className="flex items-center gap-3">
                   <button 
                     onClick={() => { setRole(null); setShowNotifications(false); }}
@@ -198,17 +215,18 @@ export default function Layout() {
 
               {/* Mobile Bottom Navigation (Instagram Style) - Only for SCM as others have their own */}
               {(role === 'SCM') && (
-                <footer className="lg:hidden h-[50px] border-t border-border-ig flex items-center justify-around bg-bg-base shrink-0">
+                <footer className="lg:hidden h-[50px] border-t border-white/10 flex items-center justify-around bg-white/10 backdrop-blur-md shrink-0">
                   <button onClick={() => setShowNotifications(false)} className="p-2">
-                    <Globe size={24} className={!showNotifications ? 'text-ig-black' : 'text-ig-grey'} />
+                    <Globe size={24} className={!showNotifications ? 'text-white' : 'text-white/40'} />
                   </button>
                   <button onClick={() => setShowNotifications(true)} className="p-2 relative">
-                    <Bell size={24} className={showNotifications ? 'text-ig-black' : 'text-ig-grey'} />
-                    {unreadCount > 0 && <span className="absolute top-2 right-2 w-[8px] h-[8px] bg-red-500 rounded-full border border-bg-base" />}
+                    <Bell size={24} className={showNotifications ? 'text-white' : 'text-white/40'} />
+                    {unreadCount > 0 && <span className="absolute top-2 right-2 w-[8px] h-[8px] bg-red-500 rounded-full border border-white/20" />}
                   </button>
                 </footer>
               )}
             </div>
+          </div>
 
             {/* Notification Sidebar as Modal Overlay for Mobile Feel */}
             <AnimatePresence>
@@ -227,36 +245,36 @@ export default function Layout() {
                     animate={{ x: 0 }}
                     exit={{ x: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="fixed lg:absolute top-0 right-0 w-full lg:w-[400px] h-full bg-bg-base z-[50] flex flex-col border-l border-border-ig shadow-2xl"
+                    className="fixed lg:absolute top-0 right-0 w-full lg:w-[400px] h-full bg-white/10 backdrop-blur-3xl z-[50] flex flex-col border-l border-white/10 shadow-2xl"
                   >
-                    <div className="h-[60px] lg:h-[80px] border-b border-border-ig px-6 flex items-center justify-between shrink-0">
-                      <h3 className="text-xl font-bold">Activity</h3>
-                      <button onClick={() => setShowNotifications(false)} className="text-ig-grey">
+                    <div className="h-[60px] lg:h-[80px] border-b border-white/10 px-6 flex items-center justify-between shrink-0">
+                      <h3 className="text-xl font-bold text-white">Activity</h3>
+                      <button onClick={() => setShowNotifications(false)} className="text-white/40 hover:text-white transition-colors">
                         <X size={24} />
                       </button>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto px-6 pb-8 space-y-4 pt-4">
                       {filteredNotifications.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-ig-grey">
-                          <Bell size={48} strokeWidth={1} className="mb-4 opacity-30" />
+                        <div className="h-full flex flex-col items-center justify-center text-white/30">
+                          <Bell size={48} strokeWidth={1} className="mb-4 opacity-30 text-white" />
                           <p className="text-sm">No new activity</p>
                         </div>
                       ) : (
                         filteredNotifications.map(notif => (
-                          <div key={notif.id} className="flex items-start gap-4 py-3 border-b border-gray-50 last:border-0 grow">
-                            <div className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${
-                              notif.type === 'success' ? 'bg-green-50 border-green-100 text-green-600' : 
-                              notif.type === 'update' ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-red-50 border-red-100 text-red-600'
+                          <div key={notif.id} className="flex items-start gap-4 py-3 border-b border-white/5 last:border-0 grow">
+                            <div className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center border shadow-sm backdrop-blur-md ${
+                              notif.type === 'success' ? 'bg-green-500/20 border-green-500/30 text-green-400' : 
+                              notif.type === 'update' ? 'bg-blue-500/20 border-blue-500/30 text-blue-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
                             }`}>
                               <Globe size={20} />
                             </div>
                             <div className="flex-1 text-[13px] leading-tight pt-1">
-                              <span className="font-bold mr-1">{notif.locationName || 'System'}</span>
-                              <span className="text-ig-black">{notif.message}</span>
-                              <p className="text-[11px] text-ig-grey mt-1.5 font-medium">{new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                              <span className="font-bold mr-1 text-white">{notif.locationName || 'System'}</span>
+                              <span className="text-white/80">{notif.message}</span>
+                              <p className="text-[11px] text-white/40 mt-1.5 font-medium">{new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
-                            <button onClick={() => dismissNotification(notif.id)} className="text-ig-grey p-1 opacity-40 hover:opacity-100">
+                            <button onClick={() => dismissNotification(notif.id)} className="text-white/30 p-1 opacity-40 hover:opacity-100">
                               <X size={14} />
                             </button>
                           </div>
@@ -284,20 +302,20 @@ function RoleAccount({ name, role, gradient, icon, onClick }: {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center justify-between p-4 bg-bg-base border border-border-ig rounded-lg hover:bg-bg-alt transition-colors group"
+      className={`w-full flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/20 transition-all group backdrop-blur-md relative overflow-hidden ${gradient}`}
     >
-      <div className="flex items-center gap-3">
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center border border-white/20 shadow-inner ${gradient}`}>
-           {icon}
-        </div>
+      <div className="flex items-center gap-4 relative z-10">
         <div className="text-left">
-          <p className="font-bold text-[14px]">{name}</p>
-          <p className="text-ig-grey text-[13px] font-medium">{role}</p>
+          <p className="font-black text-[16px] text-white tracking-tight uppercase">{name}</p>
+          {role && <p className="text-white/40 text-[11px] font-black uppercase tracking-widest mt-1">{role}</p>}
         </div>
       </div>
-      <div className="px-5 py-1.5 bg-ig-blue text-white rounded-md text-[12px] font-bold opacity-0 group-hover:opacity-100 transition-all">
-        Switch
+      <div className="relative z-10">
+        <div className="px-5 py-2 bg-white/10 text-white border border-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all shadow-xl">
+          Masuk
+        </div>
       </div>
+      {icon}
     </button>
   );
 }

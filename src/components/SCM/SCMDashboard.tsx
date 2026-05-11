@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../AppContext';
-import { Truck, Package, Clock, CheckCircle2, CreditCard, ChevronRight, Pause, Play, X, Send, History, Check, AlertTriangle, Trash2, Plus, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import { Truck, Package, Clock, CheckCircle2, CreditCard, ChevronRight, Pause, Play, X, Send, History, Check, AlertTriangle, Trash2, Plus, RefreshCw, FileSpreadsheet, Wallet } from 'lucide-react';
 import { RequestStatus, MaterialRequest } from '../../types';
 
 export default function SCMDashboard() {
@@ -21,6 +21,79 @@ export default function SCMDashboard() {
   const [showPaymentModal, setShowPaymentModal] = useState<MaterialRequest | null>(null);
   const [showMainMaterialModal, setShowMainMaterialModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+
+  const getStatusLabel = (s: string) => {
+    switch (s) {
+      case 'pending': return 'Belum Di Proses';
+      case 'processing': return 'Sedang Di Proses';
+      case 'awaiting_payment': return 'Menunggu Pembayaran';
+      case 'paid': return 'Pembayaran Berhasil';
+      case 'delivered': return 'Pengantaran';
+      case 'received': return 'Selesai Diterima';
+      case 'on_hold': return 'Tertunda (Hold)';
+      default: return s;
+    }
+  };
+
+  const getStatusColor = (s: string) => {
+    switch (s) {
+      case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'processing': return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'awaiting_payment': return 'bg-purple-50 text-purple-800 border-purple-200';
+      case 'paid': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      case 'delivered': return 'bg-green-50 text-green-700 border-green-200';
+      case 'received': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'on_hold': return 'bg-red-50 text-red-600 border-red-200';
+      default: return 'bg-gray-50 text-ig-black border-border-ig';
+    }
+  };
+
+  const getRequestTheme = (s: string) => {
+    switch (s) {
+      case 'pending': 
+        return {
+          bg: 'bg-gradient-to-br from-[#FFD700] to-[#FDB931]',
+          text: 'text-white',
+          badge: 'bg-white/20 text-white border-white/30',
+          watermark: <Clock size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+        };
+      case 'processing':
+        return {
+          bg: 'bg-gradient-to-br from-[#FF8C00] to-[#FF4500]',
+          text: 'text-white',
+          badge: 'bg-white/20 text-white border-white/30',
+          watermark: <RefreshCw size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+        };
+      case 'awaiting_payment':
+        return {
+          bg: 'bg-gradient-to-br from-[#2E0854] to-[#4B0082]',
+          text: 'text-white',
+          badge: 'bg-white/20 text-white border-white/30',
+          watermark: <Wallet size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+        };
+      case 'paid':
+        return {
+          bg: 'bg-gradient-to-br from-[#8A2BE2] to-[#B06AB3]',
+          text: 'text-white',
+          badge: 'bg-white/20 text-white border-white/30',
+          watermark: <CheckCircle2 size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+        };
+      case 'delivered':
+        return {
+          bg: 'bg-gradient-to-br from-[#25D366] to-[#128C7E]',
+          text: 'text-white',
+          badge: 'bg-white/20 text-white border-white/30',
+          watermark: <Truck size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+        };
+      default:
+        return {
+          bg: 'bg-white',
+          text: 'text-ig-black',
+          badge: 'bg-gray-100 text-gray-600 border-gray-200',
+          watermark: <Package size={80} className="absolute -right-4 -bottom-4 text-black/5 rotate-12" />
+        };
+    }
+  };
 
   const relevantRequests = requests.filter(r => r.status !== 'received');
 
@@ -48,53 +121,53 @@ export default function SCMDashboard() {
   const orphanedRequests = relevantRequests.filter(r => !subs.some(s => s.id === r.subId));
 
   return (
-    <div className="relative h-full flex flex-col bg-bg-base">
+    <div className="relative h-full flex flex-col bg-bg-base pt-[env(safe-area-inset-top)]">
       <div className="relative z-10 flex flex-col h-full bg-bg-alt overflow-hidden">
-        <header className="flex flex-col px-6 py-6 bg-bg-base border-b border-border-ig shrink-0 gap-6">
+        <header className="flex flex-col px-4 py-4 bg-bg-base border-b border-border-ig shrink-0 gap-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-bg-alt border border-border-ig flex items-center justify-center">
-                 <Truck size={24} className="text-ig-black" strokeWidth={2} />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-bg-alt border border-border-ig flex items-center justify-center">
+                 <Truck size={20} className="text-ig-black" strokeWidth={2.5} />
               </div>
               <div>
-                 <h2 className="text-lg font-bold tracking-tight">Divisi SCM</h2>
-                 <p className="text-ig-grey text-[11px] font-medium uppercase tracking-wider">Kontrol Suplai</p>
+                 <h2 className="text-base font-black tracking-tight leading-none mb-1">Divisi SCM</h2>
+                 <p className="text-ig-grey text-[9px] font-black uppercase tracking-[0.15em]">Kontrol Suplai</p>
               </div>
             </div>
             
-            <div className="flex bg-bg-alt p-1 rounded-lg border border-border-ig">
+            <div className="flex bg-bg-alt p-1 rounded-xl border border-border-ig">
                <button 
                 onClick={() => setActiveTab('active')}
-                className={`px-4 py-1.5 rounded-md text-[13px] font-bold transition-all ${activeTab === 'active' ? 'bg-white shadow-sm text-ig-blue' : 'text-ig-grey'}`}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all ${activeTab === 'active' ? 'bg-white shadow-sm text-ig-blue overflow-hidden' : 'text-ig-grey'}`}
                >
                  Aktif
                </button>
                <button 
                 onClick={() => setActiveTab('history')}
-                className={`px-4 py-1.5 rounded-md text-[13px] font-bold transition-all ${activeTab === 'history' ? 'bg-white shadow-sm text-ig-blue' : 'text-ig-grey'}`}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all ${activeTab === 'history' ? 'bg-white shadow-sm text-ig-blue overflow-hidden' : 'text-ig-grey'}`}
                >
                  Riwayat
                </button>
                <button 
                 onClick={() => setShowMainMaterialModal(true)}
-                className="ml-2 px-3 py-1.5 rounded-md text-[13px] font-bold text-green-600 bg-green-50 border border-green-100 hover:bg-green-100 transition-all flex items-center gap-2"
+                className="ml-2 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter text-green-600 bg-green-50 border border-green-100 hover:bg-green-100 transition-all flex items-center gap-1.5"
                >
-                 <Plus size={16} />
-                 Material Utama
+                 <Plus size={14} strokeWidth={3} />
+                 Material
                </button>
             </div>
           </div>
           
           {activeTab === 'active' && (
-            <div className="flex items-center gap-4">
-              <div className="flex-1 ig-card px-4 py-3 flex flex-col gap-1">
-                 <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider leading-none">Total Antrian</p>
-                 <p className="text-xl font-bold">{relevantRequests.length}</p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-white border border-border-ig rounded-2xl px-4 py-2.5 flex items-center justify-between">
+                 <p className="text-[9px] font-black text-ig-grey uppercase tracking-widest">Antrian</p>
+                 <p className="text-sm font-black italic">{relevantRequests.length}</p>
               </div>
 
-              <div className="flex-1 ig-card px-4 py-3 flex flex-col gap-1 border-ig-blue/20">
-                 <p className="text-[10px] font-bold text-ig-blue uppercase tracking-wider leading-none">Menunggu</p>
-                 <p className="text-xl font-bold">{relevantRequests.filter(r => r.status === 'pending').length}</p>
+              <div className="flex-1 bg-white border border-ig-blue/20 rounded-2xl px-4 py-2.5 flex items-center justify-between">
+                 <p className="text-[9px] font-black text-ig-blue uppercase tracking-widest">Menunggu</p>
+                 <p className="text-sm font-black italic">{relevantRequests.filter(r => r.status === 'pending').length}</p>
               </div>
             </div>
           )}
@@ -138,10 +211,12 @@ export default function SCMDashboard() {
                             key={req.id} 
                             request={req} 
                             onStatusUpdate={updateRequestStatus} 
-                            onApproveEdit={approveEdit}
-                            onRejectEdit={rejectEdit}
-                            onRequestPayment={setShowPaymentModal}
+                            onApproveEdit={approveEdit} 
+                            onRejectEdit={rejectEdit} 
+                            onRequestPayment={setShowPaymentModal} 
                             locationName={`${profile?.name} - ${sub.name}`}
+                            theme={getRequestTheme(req.status)}
+                            statusLabel={getStatusLabel(req.status)}
                           />
                         ))}
                       </div>
@@ -168,6 +243,8 @@ export default function SCMDashboard() {
                           }
                         }}
                         locationName="Domain Kosong"
+                        theme={getRequestTheme(req.status)}
+                        statusLabel={getStatusLabel(req.status)}
                       />
                     ))}
                   </div>
@@ -193,40 +270,39 @@ export default function SCMDashboard() {
                         <div className="w-2 h-2 rounded-full bg-green-500" />
                         <h3 className="text-sm font-bold tracking-tight">{fullName}</h3>
                       </div>
-                      <div className="ig-card divide-y divide-gray-50 overflow-hidden">
-                         {sub.history.map((item) => (
-                           <div key={item.id} className="p-4 flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                 <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600 border border-green-100">
-                                    <Package size={14} />
-                                 </div>
-                                 <div>
-                                    <p className="text-sm font-bold leading-tight">{item.materialName}</p>
-                                    <p className="text-[10px] text-ig-grey font-medium mt-0.5">
-                                       Diterima: {new Date((item as any).receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                    </p>
-                                 </div>
-                              </div>
-                              <div className="flex items-center gap-4">
-                                 <button
-                                   onClick={() => {
-                                     syncDirectToSheet(item, fullName);
-                                     alert(`Sinkronisasi "${item.materialName}" dikirim ke Spreadsheet!`);
-                                   }}
-                                   className="p-2 rounded-full hover:bg-ig-blue/5 text-ig-grey hover:text-ig-blue transition-colors"
-                                   title="Backup to Spreadsheet"
-                                 >
-                                    <RefreshCw size={14} />
-                                 </button>
-                                 <div className="text-right">
-                                    <p className="text-lg font-bold tracking-tighter leading-none">
-                                       {item.quantity} 
-                                    </p>
-                                    <span className="text-[10px] text-ig-grey uppercase font-bold">{item.unit}</span>
-                                 </div>
-                              </div>
-                           </div>
-                         ))}
+                      <div className="bg-white border border-border-ig rounded-2xl divide-y divide-gray-50 overflow-hidden shadow-sm">
+                          {sub.history.map((item) => (
+                            <div key={item.id} className="p-3 flex items-center justify-between active:bg-bg-alt transition-colors">
+                               <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600 border border-green-100">
+                                     <Package size={14} />
+                                  </div>
+                                  <div>
+                                     <p className="text-xs font-black tracking-tight leading-tight">{item.materialName}</p>
+                                     <p className="text-[9px] text-ig-grey font-bold uppercase tracking-tighter mt-0.5">
+                                        {new Date((item as any).receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                     </p>
+                                  </div>
+                               </div>
+                               <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => {
+                                      syncDirectToSheet(item, fullName);
+                                      alert(`Sinkronisasi "${item.materialName}" dikirim ke Spreadsheet!`);
+                                    }}
+                                    className="p-2 rounded-xl bg-bg-alt text-ig-grey hover:text-ig-blue transition-colors"
+                                  >
+                                     <RefreshCw size={12} />
+                                  </button>
+                                  <div className="text-right">
+                                     <p className="text-sm font-black italic text-ig-black leading-none">
+                                        {item.quantity} 
+                                     </p>
+                                     <span className="text-[9px] text-ig-grey uppercase font-black">{item.unit}</span>
+                                  </div>
+                               </div>
+                            </div>
+                          ))}
                       </div>
                   </div>
                 );
@@ -277,7 +353,7 @@ function MainMaterialModal({ materials, onAdd, onDelete, onClose }: {
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative border border-border-ig flex flex-col"
+        className="bg-bg-base w-full max-w-sm rounded-[24px] p-6 shadow-2xl relative border border-border-ig flex flex-col"
       >
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-base font-bold">Daftar Material Utama</h3>
@@ -362,6 +438,8 @@ const RequestItem: React.FC<{
   onRequestPayment: (req: MaterialRequest) => void;
   onDelete?: (id: string) => void;
   locationName: string;
+  theme: any;
+  statusLabel: string;
 }> = ({ 
   request, 
   onStatusUpdate, 
@@ -369,7 +447,9 @@ const RequestItem: React.FC<{
   onRejectEdit,
   onRequestPayment,
   onDelete,
-  locationName
+  locationName,
+  theme,
+  statusLabel
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -397,33 +477,28 @@ const RequestItem: React.FC<{
   };
 
   return (
-    <div className={`ig-card overflow-hidden transition-all ${
-      request.status === 'on_hold' ? 'bg-red-50/30' : 'bg-bg-base'
-    }`}>
+    <div className={`border border-white/10 rounded-2xl shadow-md transition-all relative overflow-hidden ${theme.bg} mb-2`}>
+      {theme.watermark}
       <button 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 flex items-center justify-between text-left"
+        className="w-full p-4 flex items-center justify-between text-left relative z-10"
       >
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full bg-bg-alt flex items-center justify-center border border-border-ig ${getStatusColor(request.status)}`}>
-            {request.status === 'delivered' ? <Truck size={18} /> : <Package size={18} />}
+          <div className={`w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-sm ${theme.text}`}>
+            {request.status === 'delivered' ? <Truck size={18} /> : 
+             request.status === 'processing' ? <RefreshCw size={18} /> :
+             request.status === 'awaiting_payment' ? <Wallet size={18} /> :
+             request.status === 'paid' ? <CheckCircle2 size={18} /> :
+             <Package size={18} />}
           </div>
           <div>
-            <p className="text-sm font-bold tracking-tight">{request.materialName}</p>
-            <StatusTimer status={request.status} startTime={currentStatusStartTime} />
+            <p className={`text-sm font-black tracking-tight ${theme.text}`}>{request.materialName}</p>
+            <StatusTimer status={request.status} startTime={currentStatusStartTime} theme={theme} statusLabel={statusLabel} />
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {request.pendingEdit && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />}
-          {onDelete && (
-             <button 
-              onClick={(e) => { e.stopPropagation(); onDelete(request.id); }}
-              className="p-2 text-red-400 hover:text-red-600 transition-colors"
-             >
-                <Trash2 size={16} />
-             </button>
-          )}
-          <div className={`text-ig-grey transition-transform ${isExpanded ? 'rotate-90 text-ig-blue' : ''}`}>
+          {request.pendingEdit && <div className="w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_10px_white] animate-pulse" />}
+          <div className={`transition-transform ${theme.text} opacity-60 ${isExpanded ? 'rotate-90' : ''}`}>
              <ChevronRight size={18} />
           </div>
         </div>
@@ -435,44 +510,44 @@ const RequestItem: React.FC<{
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="px-4 pb-4 space-y-4"
+            className="px-4 pb-4 space-y-4 relative z-10"
           >
             {request.pendingEdit && (
-              <div className="p-4 bg-yellow-50 border border-yellow-100 rounded-lg space-y-3">
-                <div className="flex items-center gap-2 text-yellow-800">
+              <div className="p-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-white">
                   <AlertTriangle size={16} />
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Permintaan Edit</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Ada Revisi Dari Site Manager</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                   <div className="text-[10px] text-yellow-600">Nama Baru: <span className="font-bold text-yellow-900">{request.pendingEdit.materialName}</span></div>
-                   <div className="text-[10px] text-yellow-600">Kuantitas: <span className="font-bold text-yellow-900">{request.pendingEdit.quantity} {request.pendingEdit.unit}</span></div>
-                   <div className="text-[10px] text-yellow-600">Batas: <span className="font-bold text-yellow-900">{new Date(request.pendingEdit.dateNeeded).toLocaleDateString()}</span></div>
+                   <div className="text-[9px] text-white/70 font-bold uppercase">Nama: <span className="font-black text-white">{request.pendingEdit.materialName}</span></div>
+                   <div className="text-[9px] text-white/70 font-bold uppercase">Jumlah: <span className="font-black text-white">{request.pendingEdit.quantity} {request.pendingEdit.unit}</span></div>
+                   <div className="text-[9px] text-white/70 font-bold uppercase">Deadline: <span className="font-black text-white">{new Date(request.pendingEdit.dateNeeded).toLocaleDateString()}</span></div>
                 </div>
                 <div className="flex gap-2 pt-2">
                    <button 
                     onClick={(e) => { e.stopPropagation(); onApproveEdit(request.id); }}
-                    className="flex-1 bg-yellow-500 text-white py-1.5 rounded-md text-[10px] font-bold uppercase"
+                    className="flex-1 bg-white text-ig-black py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all"
                    >
-                     Setujui
+                     SETUJUI REVISI
                    </button>
                    <button 
                     onClick={(e) => { e.stopPropagation(); onRejectEdit(request.id); }}
-                    className="flex-1 bg-white text-yellow-700 border border-yellow-200 py-1.5 rounded-md text-[10px] font-bold uppercase"
+                    className="flex-1 bg-white/10 text-white border border-white/30 py-2.5 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all"
                    >
-                     Tolak
+                     TOLAK
                    </button>
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 p-3 bg-bg-alt rounded-lg border border-border-ig">
+            <div className="grid grid-cols-2 gap-3 p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
               <div className="space-y-1">
-                <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider leading-none">Jumlah</p>
-                <p className="text-sm font-bold">{request.quantity} {request.unit.toUpperCase()}</p>
+                <p className={`text-[9px] font-black uppercase tracking-widest ${theme.text} opacity-70`}>Volume</p>
+                <p className={`text-sm font-black italic ${theme.text}`}>{request.quantity} {request.unit.toUpperCase()}</p>
               </div>
               <div className="space-y-1 text-right">
-                <p className="text-[10px] font-bold text-ig-grey uppercase tracking-wider leading-none">Batas</p>
-                <p className="text-sm font-bold">{new Date(request.dateNeeded).toLocaleDateString()}</p>
+                <p className={`text-[9px] font-black uppercase tracking-widest ${theme.text} opacity-70`}>Batas Waktu</p>
+                <p className={`text-sm font-black ${theme.text}`}>{new Date(request.dateNeeded).toLocaleDateString()}</p>
               </div>
             </div>
 
@@ -480,54 +555,63 @@ const RequestItem: React.FC<{
               <div className="flex items-center gap-2">
                 {request.status === 'pending' && (
                   <ActionButton 
-                    label="Proses" 
-                    icon={<Play size={14} />} 
+                    label="PROSES SEKARANG" 
+                    icon={<Play size={14} fill="currentColor" />} 
                     onClick={() => onStatusUpdate(request.id, 'processing')}
-                    className="flex-1 bg-amber-500 text-white" 
+                    className="flex-1 bg-white text-amber-500 shadow-xl" 
                   />
                 )}
                 {request.status === 'processing' && (
                   <ActionButton 
-                    label="Ajukan Bayar" 
-                    icon={<CreditCard size={14} />} 
+                    label="AJUKAN PEMBAYARAN" 
+                    icon={<Send size={14} />} 
                     onClick={() => onRequestPayment(request)}
-                    className="flex-1 bg-ig-blue text-white" 
+                    className="flex-1 bg-white text-orange-600 shadow-xl" 
                   />
                 )}
                 {request.status === 'paid' && (
                   <ActionButton 
-                    label="Kirim Barang" 
-                    icon={<Truck size={14} />} 
+                    label="PENGIRIMAN BARANG" 
+                    icon={<Truck size={16} />} 
                     onClick={() => onStatusUpdate(request.id, 'delivered')}
-                    className="flex-1 bg-green-600 text-white" 
+                    className="flex-1 bg-white text-indigo-600 shadow-xl" 
                   />
                 )}
                 {request.status === 'delivered' && (
-                  <div className="flex-1 h-10 flex items-center justify-center text-[11px] font-bold text-ig-blue bg-blue-50 rounded-md border border-blue-100 italic">
-                    Sedang Diantar
-                  </div>
+                    <div className="flex-1 h-12 flex items-center justify-center gap-2 text-[11px] font-black text-white bg-white/10 border border-white/30 rounded-xl italic">
+                        <Truck size={14} /> DALAM PERJALANAN...
+                    </div>
                 )}
                 {request.status === 'awaiting_payment' && (
-                  <div className="flex-1 h-10 flex items-center justify-center text-[11px] font-bold text-ig-grey bg-bg-alt rounded-md border border-border-ig italic">
-                    Menunggu Pembayaran
-                  </div>
+                    <div className="flex-1 h-12 flex items-center justify-center gap-2 text-[11px] font-black text-white bg-white/10 border border-white/30 rounded-xl italic">
+                        <Wallet size={14} /> MENUNGGU ADMIN FINANCE
+                    </div>
                 )}
 
                 {['pending', 'processing', 'awaiting_payment', 'paid'].includes(request.status) ? (
                   <ActionButton 
-                    label="Hold" 
+                    label="HOLD" 
                     icon={<Pause size={14} />} 
                     onClick={() => onStatusUpdate(request.id, 'on_hold')}
-                    className="bg-bg-alt text-red-500 w-16 border border-border-ig" 
+                    className="bg-white/10 text-white w-20 border border-white/30" 
                   />
                 ) : request.status === 'on_hold' ? (
                   <ActionButton 
-                    label="Lanjutkan" 
-                    icon={<Play size={14} />} 
+                    label="LANJUTKAN PROSES" 
+                    icon={<Play size={14} fill="currentColor" />} 
                     onClick={() => onStatusUpdate(request.id, getResumeStatus())}
-                    className="flex-1 bg-ig-blue text-white" 
+                    className="flex-1 bg-white text-red-500 shadow-xl" 
                   />
                 ) : null}
+                
+                {onDelete && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(request.id); }}
+                    className="w-12 h-12 flex items-center justify-center bg-white/10 text-white border border-white/30 rounded-xl active:scale-95 transition-all"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
@@ -565,7 +649,7 @@ function PaymentModal({ request, locationName, onClose, onConfirm }: {
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-8 shadow-2xl relative border border-border-ig"
+        className="bg-bg-base w-full max-w-sm rounded-[24px] p-6 shadow-2xl relative border border-border-ig"
       >
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-base font-bold">Pengajuan Pembayaran</h3>
@@ -631,7 +715,7 @@ function PaymentModal({ request, locationName, onClose, onConfirm }: {
   );
 }
 
-function StatusTimer({ status, startTime }: { status: RequestStatus, startTime: number }) {
+function StatusTimer({ status, startTime, theme, statusLabel }: { status: RequestStatus, startTime: number, theme: any, statusLabel: string }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -651,28 +735,14 @@ function StatusTimer({ status, startTime }: { status: RequestStatus, startTime: 
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getStatusLabel = (s: RequestStatus) => {
-    switch (s) {
-      case 'pending': return 'Belum di proses';
-      case 'processing': return 'Diproses';
-      case 'awaiting_payment': return 'Menunggu Pembayaran';
-      case 'paid': return 'Pembayaran Berhasil';
-      case 'delivered': return 'Pengantaran';
-      case 'on_hold': return 'HOLD';
-      default: return s;
-    }
-  };
-
   return (
-    <div className="flex items-center gap-2 mt-1">
-      <span className={`text-[10px] font-bold uppercase ${
-        status === 'on_hold' ? 'text-red-500' : 'text-ig-blue'
-      }`}>
-        {getStatusLabel(status)}
+    <div className="flex items-center gap-2 mt-0.5">
+      <span className={`text-[9px] font-black uppercase tracking-widest ${theme.text}`}>
+        {statusLabel}
       </span>
-      <span className="text-ig-grey opacity-30 mx-1">•</span>
-      <span className={`text-[10px] font-medium tracking-tight ${status === 'on_hold' ? 'text-red-500 italic' : 'text-ig-grey'}`}>
-        {status === 'on_hold' ? 'Terkunci' : formatTime(elapsed)}
+      <span className={`${theme.text} opacity-30 text-[8px]`}>|</span>
+      <span className={`text-[10px] font-bold tracking-tight ${theme.text} opacity-80`}>
+        {status === 'on_hold' ? 'TERKUNCI' : formatTime(elapsed)}
       </span>
     </div>
   );
