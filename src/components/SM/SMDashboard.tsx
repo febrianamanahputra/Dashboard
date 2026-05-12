@@ -3,8 +3,44 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../AppContext';
 import { db } from '../../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle, Truck, Check, Banknote, MessageCircle } from 'lucide-react';
+import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle, Truck, Check, Banknote, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { StockEntry, MaterialRequest, RequestStatus } from '../../types';
+
+const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
+  if (e.key === 'Enter' && e.currentTarget.tagName !== 'TEXTAREA') {
+    const form = (e.currentTarget as HTMLInputElement).form;
+    if (form) {
+      e.preventDefault();
+      const elements = Array.from(form.elements) as HTMLElement[];
+      const index = elements.indexOf(e.currentTarget as any);
+      if (index > -1) {
+        let nextIndex = index + 1;
+        while (elements[nextIndex]) {
+          const nextElement = elements[nextIndex];
+          if (
+            (nextElement.tagName === 'INPUT' || nextElement.tagName === 'SELECT') &&
+            !(nextElement as any).disabled &&
+            (nextElement as any).type !== 'hidden' &&
+            (nextElement as any).type !== 'submit'
+          ) {
+            nextElement.focus();
+            return;
+          }
+          if (nextElement.tagName === 'BUTTON' && (nextElement as any).type === 'submit') {
+            nextElement.focus();
+            return;
+          }
+          nextIndex++;
+        }
+      }
+    }
+  }
+};
+
+const toTitleCase = (str: string) => {
+  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+};
+
 import RAPDashboard from '../RAP/RAPDashboard';
 import * as XLSX from 'xlsx';
 
@@ -63,16 +99,72 @@ export default function SMDashboard() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showAddSub, setShowAddSub] = useState(false);
   const [showEditSub, setShowEditSub] = useState<string | null>(null);
+  const [subToDelete, setSubToDelete] = useState<any>(null);
   const [selectedStock, setSelectedStock] = useState<StockEntry | null>(null);
   const [selectedRequestForDetail, setSelectedRequestForDetail] = useState<MaterialRequest | null>(null);
   const [editQuantity, setEditQuantity] = useState<string>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [view, setView] = useState<'main' | 'rap'>('main');
   const [activeTab, setActiveTab] = useState<'active' | 'riwayat' | 'total' | 'stok'>('active');
+  const [viewingHistorySubId, setViewingHistorySubId] = useState<string | null>(null);
   const [subStock, setSubStock] = useState<StockEntry[]>([]);
   const [receivingRequest, setReceivingRequest] = useState<MaterialRequest | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [viewingNota, setViewingNota] = useState<any>(null);
   const [activeView, setActiveView] = useState<'reports' | 'requests' | 'funds' | 'profile'>('requests');
   const [reportDrafts, setReportDrafts] = useState<Record<string, string[]>>({});
+
+  // Back Button Navigation Support for Android/Mobile Browser
+  React.useEffect(() => {
+    const hasOpenModal = !!(
+      showAddForm || 
+      editingRequest || 
+      showMainRequestForm || 
+      selectedStock || 
+      selectedRequestForDetail || 
+      receivingRequest || 
+      showAdd || 
+      viewingNota ||
+      showAddProfile ||
+      showAddSub ||
+      showEditProfile ||
+      showEditSub
+    );
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (hasOpenModal) {
+        // Close all modals instead of navigating away
+        setShowAddForm(false);
+        setEditingRequest(null);
+        setShowMainRequestForm(false);
+        setSelectedStock(null);
+        setSelectedRequestForDetail(null);
+        setReceivingRequest(null);
+        setShowAdd(false);
+        setViewingNota(null);
+        setShowAddProfile(false);
+        setShowAddSub(false);
+        setShowEditProfile(false);
+        setShowEditSub(null);
+        
+        // Push state again to prevent further back navigation if user presses back again
+        // unless they want to go back from the current "view"
+      } else if (activeView !== 'requests') {
+        setActiveView('requests');
+      }
+    };
+
+    if (hasOpenModal || activeView !== 'requests') {
+      window.history.pushState({ view: activeView, modal: hasOpenModal }, "");
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    showAddForm, editingRequest, showMainRequestForm, selectedStock, 
+    selectedRequestForDetail, receivingRequest, showAdd, viewingNota,
+    showAddProfile, showAddSub, showEditProfile, showEditSub, activeView
+  ]);
 
   const activeProfile = profiles.find(p => p.id === activeProfileId);
   const profileSubs = subs.filter(s => s.profileId === activeProfileId);
@@ -168,7 +260,7 @@ export default function SMDashboard() {
       case 'awaiting_payment': return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
       case 'paid': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30';
       case 'delivered': return 'bg-green-500/10 text-green-500 border-green-500/30';
-      case 'received': return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+      case 'received': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
       case 'on_hold': return 'bg-red-500/10 text-red-500 border-red-500/30';
       default: return 'bg-white/5 text-white border-white/10';
     }
@@ -287,7 +379,7 @@ export default function SMDashboard() {
                     onClick={() => setActiveSubId(sub.id)}
                     className={`shrink-0 px-5 py-1.5 text-[10px] font-black rounded-lg transition-all uppercase tracking-widest ${
                       activeSubId === sub.id 
-                        ? 'bg-white text-ig-blue shadow-lg' 
+                        ? 'bg-white text-black shadow-lg' 
                         : 'text-white/60 hover:text-white hover:bg-white/5'
                     }`}
                   >
@@ -450,27 +542,90 @@ export default function SMDashboard() {
                         )}
                         {activeTab === 'riwayat' && (
                           <>
-                            <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Material Diterima</h3>
-                            {historyRequests.length === 0 ? (
-                              <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
-                                 <History size={32} className="mb-2" />
-                                 <p className="text-xs font-bold uppercase tracking-widest">Belum ada riwayat</p>
+                            {!viewingHistorySubId ? (
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between px-1">
+                                  <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Riwayat Per Lokasi</h3>
+                                </div>
+                                <div className="grid grid-cols-1 gap-2">
+                                  {profileSubs.map(sub => {
+                                    const subHistoryCount = requests.filter(r => r.subId === sub.id && r.status === 'received').length;
+                                    return (
+                                      <button 
+                                        key={sub.id}
+                                        onClick={() => setViewingHistorySubId(sub.id)}
+                                        className="bg-white/5 border border-white/10 p-5 rounded-2xl flex items-center justify-between group hover:bg-white/10 transition-all active:scale-[0.98]"
+                                      >
+                                        <div className="flex items-center gap-4">
+                                          <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40 group-hover:text-white transition-colors">
+                                            <MapPin size={20} />
+                                          </div>
+                                          <div className="text-left">
+                                            <p className="text-sm font-black text-white uppercase tracking-tight">{sub.name}</p>
+                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{subHistoryCount} Item Diterima</p>
+                                          </div>
+                                        </div>
+                                        <ChevronRight size={18} className="text-white/20 group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             ) : (
-                              historyRequests.map(req => (
-                                <div key={req.id} className="ig-card p-4 flex items-center justify-between border-l-4 border-green-500">
-                                  <div className="flex gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600"><CheckCircle2 size={20} /></div>
-                                    <div>
-                                      <p className="text-sm font-bold tracking-tight">{req.materialName}</p>
-                                      <p className="text-[10px] text-ig-grey font-medium italic mt-1">Diterima: {new Date(req.receivedAt).toLocaleDateString('id-ID')}</p>
-                                    </div>
-                                  </div>
-                                  <div className="text-right">
-                                     <p className="text-sm font-black italic">{req.quantity} <span className="text-[10px] opacity-60">{req.unit}</span></p>
-                                  </div>
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                  <button 
+                                    onClick={() => setViewingHistorySubId(null)}
+                                    className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white"
+                                  >
+                                    <ChevronLeft size={20} />
+                                  </button>
+                                  <h3 className="text-[10px] font-bold text-white uppercase tracking-widest">
+                                    Riwayat: {subs.find(s => s.id === viewingHistorySubId)?.name}
+                                  </h3>
                                 </div>
-                              ))
+                                
+                                {requests.filter(r => r.subId === viewingHistorySubId && r.status === 'received').length === 0 ? (
+                                  <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
+                                    <History size={32} className="mb-2" />
+                                    <p className="text-xs font-bold uppercase tracking-widest text-white">Belum ada riwayat</p>
+                                  </div>
+                                ) : (
+                                  requests
+                                    .filter(r => r.subId === viewingHistorySubId && r.status === 'received')
+                                    .sort((a,b) => (b.history.find(h => h.status === 'received')?.timestamp || 0) - (a.history.find(h => h.status === 'received')?.timestamp || 0))
+                                    .map(req => (
+                                      <div key={req.id} className="bg-white/5 backdrop-blur-md p-4 flex items-center justify-between border border-white/10 rounded-2xl group">
+                                        <div className="flex gap-4">
+                                          <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 border border-green-500/20">
+                                            <CheckCircle2 size={18} />
+                                          </div>
+                                          <div>
+                                            <p className="text-sm font-black text-white tracking-tight leading-none mb-1.5">{req.materialName}</p>
+                                            <p className="text-[9px] text-white/40 font-bold uppercase tracking-widest">
+                                              Diterima: {new Date(req.history.find(h => h.status === 'received')?.timestamp || 0).toLocaleDateString('id-ID')}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                          <div className="text-right">
+                                            <p className="text-sm font-black text-white italic">{req.quantity} <span className="text-[10px] opacity-40 uppercase">{req.unit}</span></p>
+                                          </div>
+                                          <button 
+                                            onClick={() => {
+                                              if (confirm('Hapus riwayat ini? (Ini tidak akan mengembalikan stok)')) {
+                                                deleteRequest(req.id);
+                                              }
+                                            }}
+                                            className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))
+                                )}
+                              </div>
                             )}
                           </>
                         )}
@@ -546,7 +701,13 @@ export default function SMDashboard() {
                   exit={{ opacity: 0, x: 20 }}
                   className="flex-1 flex flex-col h-full overflow-hidden"
                 >
-                  <FundsView subId={activeSubId || ''} />
+                  <FundsView 
+                    subId={activeSubId || ''} 
+                    showAdd={showAdd}
+                    setShowAdd={setShowAdd}
+                    viewingNota={viewingNota}
+                    setViewingNota={setViewingNota}
+                  />
                 </motion.div>
               )}
 
@@ -579,6 +740,10 @@ export default function SMDashboard() {
               profiles={profiles}
               onSelect={setActiveProfileId}
               onAdd={() => setShowAddProfile(true)}
+              onEdit={(prof: any) => {
+                setActiveProfileId(prof.id);
+                setShowEditProfile(true);
+              }}
               getProfileAvatar={getProfileAvatar}
             />
           )}
@@ -685,6 +850,20 @@ export default function SMDashboard() {
             onDelete={() => {
               setShowEditProfile(false);
               setShowDeleteConfirm(true);
+            }}
+            onDeleteSub={(sub) => setSubToDelete(sub)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {subToDelete && (
+          <DeleteSubConfirmModal 
+            sub={subToDelete} 
+            onClose={() => setSubToDelete(null)}
+            onConfirm={(cascade) => {
+              removeSub(subToDelete.id, cascade);
+              setSubToDelete(null);
             }}
           />
         )}
@@ -839,6 +1018,7 @@ export default function SMDashboard() {
                         <input 
                           type="number"
                           className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-lg font-black text-white focus:ring-2 focus:ring-white/40 outline-none transition-all"
+                          onFocus={e => e.target.select()}
                           value={editQuantity}
                           onChange={(e) => setEditQuantity(e.target.value)}
                         />
@@ -935,6 +1115,67 @@ function NavButton({ active, onClick, icon, label }: { active: boolean; onClick:
   );
 }
 
+function DeleteSubConfirmModal({ 
+  sub, 
+  onClose, 
+  onConfirm 
+}: { 
+  sub: any; 
+  onClose: () => void; 
+  onConfirm: (cascade: boolean) => void 
+}) {
+  const [cascade, setCascade] = useState(false);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[500] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-[#1a1a1a] border border-white/10 rounded-[40px] p-8 max-w-sm w-full shadow-2xl text-center"
+      >
+        <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6 mx-auto border border-red-500/10">
+          <AlertTriangle size={32} />
+        </div>
+        
+        <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">Hapus Lokasi?</h3>
+        <p className="text-xs text-white/40 mb-8 font-medium">
+          Dihapus: <span className="text-white font-bold">{sub.name}</span>
+        </p>
+
+        <div 
+          onClick={() => setCascade(!cascade)}
+          className={`flex items-center gap-4 p-5 rounded-[24px] border cursor-pointer transition-all mb-8 text-left ${
+            cascade ? 'bg-red-500/10 border-red-500/40' : 'bg-white/5 border-white/10 hover:bg-white/10'
+          }`}
+        >
+          <div className={`w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all shrink-0 ${cascade ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/20' : 'border-white/20'}`}>
+            {cascade && <Check size={18} strokeWidth={4} />}
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-white uppercase tracking-[0.2em] leading-none mb-1.5">Hapus Seluruh Data</p>
+            <p className="text-[8px] text-white/30 font-bold uppercase tracking-widest leading-relaxed">Termasuk SCM, Finance, RAP & Stok di lokasi ini.</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <button 
+            onClick={() => onConfirm(cascade)}
+            className="w-full bg-red-500 text-white py-5 rounded-3xl font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-red-500/40 active:scale-95 transition-all"
+          >
+            KONFIRMASI HAPUS
+          </button>
+          <button 
+            onClick={onClose}
+            className="w-full py-4 text-white/30 font-black text-[10px] uppercase tracking-widest hover:text-white transition-all"
+          >
+            BATAL
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function ReportView({ 
   subId, 
   draftRows, 
@@ -999,7 +1240,7 @@ function ReportView({
     const hour = new Date().getHours();
     const isAfternoon = hour >= 13;
     const separator = "________________________________________";
-    const locationName = activeProfile ? activeProfile.name : 'Project';
+    const locationName = activeSub ? activeSub.name : 'Project';
     const targetLocation = locationName;
     const dateStr = getIndonesianDate();
 
@@ -1011,9 +1252,9 @@ function ReportView({
       if (validLines.length === 0) return alert('Input laporan terlebih dahulu');
       
       if (isAfternoon) {
-        message = `*Bismillah,*\n*Progress Project ${targetLocation}*\n\n\n\`${dateStr}\`\n${separator}\n${validLines.join('\n')}\n${separator}\nTerima kasih`;
+        message = `*Bismillah,*\n*Progress Project ${targetLocation}*\n\`${dateStr}\`\n${separator}\n${validLines.join('\n')}\n\nTerima kasih`;
       } else {
-        message = `Bismillah, Selamat Pagi Bapak/ibu\nRencana Kerja ${targetLocation}\n\n\n${dateStr}\n${separator}\n${validLines.join('\n')}\n${separator}\nTerima kasih`;
+        message = `Bismillah, Selamat Pagi Bapak/ibu\nRencana Kerja ${targetLocation}\n\`${dateStr}\`\n${separator}\n${validLines.join('\n')}\n\nTerima kasih`;
       }
     } else if (lineIndex !== undefined) {
       const lineText = rows[lineIndex].trim();
@@ -1056,6 +1297,8 @@ function ReportView({
                     className="flex-1 px-4 py-3 text-xs font-bold outline-none bg-transparent text-white placeholder:text-white/60 placeholder:italic z-10"
                     placeholder="Input detail pekerjaan..."
                     value={row}
+                    onKeyDown={handleEnterNextField}
+                    onBlur={(e) => updateRow(idx, toTitleCase(e.target.value))}
                     onChange={(e) => updateRow(idx, e.target.value)}
                   />
                   <button 
@@ -1148,7 +1391,7 @@ function ReportSettingsModal({ subId, onClose, initialTemplate, onSave }: any) {
           </div>
           <button 
             onClick={() => onSave(heading, footer)}
-            className="w-full bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+            className="w-full bg-white text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
           >
             Simpan Template
           </button>
@@ -1169,8 +1412,8 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     materialName: initialData?.materialName || '',
-    quantity: initialData?.quantity || 1,
-    unit: initialData?.unit || 'zak',
+    quantity: initialData?.quantity || 0,
+    unit: initialData?.unit || '',
     dateRequested: initialData?.dateRequested || new Date().toISOString().split('T')[0],
     dateNeeded: initialData?.dateNeeded || '',
     subId
@@ -1234,6 +1477,8 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
               type="text" 
               placeholder="Contoh: Semen Padang"
               className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all"
+              onKeyDown={handleEnterNextField}
+              onBlur={e => setForm({...form, materialName: toTitleCase(e.target.value)})}
               value={form.materialName}
               onChange={e => setForm({...form, materialName: e.target.value})}
             />
@@ -1246,22 +1491,26 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
                 required
                 disabled={isSubmitting}
                 type="number" 
-                min="1"
                 className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all"
-                value={form.quantity}
+                onKeyDown={handleEnterNextField}
+                onFocus={e => e.target.select()}
+                value={form.quantity || ''}
                 onChange={e => setForm({...form, quantity: parseFloat(e.target.value) || 0})}
               />
             </div>
             <div className="space-y-1.5 text-left">
               <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Satuan</label>
-              <select 
+              <input 
+                required
                 disabled={isSubmitting}
-                className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none appearance-none cursor-pointer"
+                type="text"
+                placeholder="zak/kg/batang"
+                className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all"
+                onKeyDown={handleEnterNextField}
+                onBlur={e => setForm({...form, unit: toTitleCase(e.target.value)})}
                 value={form.unit}
                 onChange={e => setForm({...form, unit: e.target.value})}
-              >
-                {UNITS.map(u => <option key={u} value={u} className="text-black">{u.toUpperCase()}</option>)}
-              </select>
+              />
             </div>
           </div>
 
@@ -1272,6 +1521,7 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
               disabled={isSubmitting}
               type="date" 
               className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all color-scheme-dark"
+              onKeyDown={handleEnterNextField}
               value={form.dateNeeded}
               onChange={e => setForm({...form, dateNeeded: e.target.value})}
             />
@@ -1280,7 +1530,7 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
           <button 
             type="submit"
             disabled={isSubmitting}
-            className="w-full mt-4 bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+            className="w-full mt-4 bg-white text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
           >
             {isSubmitting ? 'Mengirim...' : isEdit ? (isLocked ? 'Kirim Permintaan Edit' : 'Simpan Perubahan') : 'Kirim Request'}
           </button>
@@ -1298,7 +1548,7 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMaterialId, setSelectedMaterialId] = useState(materials?.[0]?.id || '');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(0);
   const [dateNeeded, setDateNeeded] = useState('');
 
   React.useEffect(() => {
@@ -1342,6 +1592,7 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
               required
               disabled={isSubmitting}
               className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white focus:bg-white/10 outline-none appearance-none cursor-pointer"
+              onKeyDown={handleEnterNextField}
               value={selectedMaterialId}
               onChange={e => setSelectedMaterialId(e.target.value)}
             >
@@ -1359,9 +1610,10 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
                 required
                 disabled={isSubmitting}
                 type="number" 
-                min="1"
                 className="flex-1 bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10"
-                value={quantity}
+                onKeyDown={handleEnterNextField}
+                onFocus={e => e.target.select()}
+                value={quantity || ''}
                 onChange={e => setQuantity(parseFloat(e.target.value) || 0)}
               />
               <span className="font-black text-white/60 uppercase text-[10px]">
@@ -1377,6 +1629,7 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
               disabled={isSubmitting}
               type="date" 
               className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 color-scheme-dark"
+              onKeyDown={handleEnterNextField}
               value={dateNeeded}
               onChange={e => setDateNeeded(e.target.value)}
             />
@@ -1385,7 +1638,7 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
           <button 
             type="submit"
             disabled={isSubmitting || !selectedMaterialId}
-            className="w-full mt-4 bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
+            className="w-full mt-4 bg-white text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
           >
             {isSubmitting ? 'Mengirim...' : 'Kirim Request Utama'}
           </button>
@@ -1395,14 +1648,18 @@ function MainRequestFormModal({ onClose, subId, materials = [], onSubmit }: {
   );
 }
 
-function EditProfileModal({ profile, onClose, onUpdate, onDelete }: { 
+function EditProfileModal({ profile, onClose, onUpdate, onDelete, onDeleteSub }: { 
   profile: any; 
   onClose: () => void; 
   onUpdate: (name: string, avatar: string) => void;
   onDelete: () => void;
+  onDeleteSub: (sub: any) => void;
 }) {
+  const { subs, addSub } = useApp();
+  const profileSubs = subs.filter(s => s.profileId === profile.id);
   const [name, setName] = useState(profile.name);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl || '');
+  const [newSubName, setNewSubName] = useState('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1421,67 +1678,121 @@ function EditProfileModal({ profile, onClose, onUpdate, onDelete }: {
       <motion.div 
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-white/20 flex flex-col"
+        className="bg-[#121212] backdrop-blur-3xl w-full max-w-sm rounded-[40px] p-8 shadow-2xl border border-white/10 flex flex-col max-h-[90vh] overflow-hidden"
       >
-        <div className="flex items-center justify-between mb-8">
-          <h3 className="text-base font-black text-white">Pengaturan Profile</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
-            <X size={24} />
+        <div className="flex items-center justify-between mb-8 shrink-0">
+          <h3 className="text-base font-black text-white uppercase tracking-widest">Settings</h3>
+          <button onClick={onClose} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors">
+            <X size={20} />
           </button>
         </div>
 
-        <div className="space-y-6">
-          <div className="flex flex-col items-center gap-4">
-             <div className="w-24 h-24 rounded-full border-2 border-white/20 p-1 bg-transparent shadow-xl">
-                <div className="w-full h-full rounded-full bg-transparent border border-white/10 flex items-center justify-center overflow-hidden">
-                   {avatarUrl ? (
-                     <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                   ) : (
-                     <UserCircle size={48} className="text-white/20" />
-                   )}
-                </div>
-             </div>
-             <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/*" 
-              onChange={handleFileChange}
-             />
-             <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="text-xs font-black text-white hover:text-white/80 flex items-center gap-2 uppercase tracking-widest"
-             >
-                <Camera size={14} />
-                Ganti Foto
-             </button>
-          </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-8 pr-1">
+          {/* Profile Section */}
+          <div className="space-y-6">
+            <div className="flex flex-col items-center gap-4">
+               <div className="w-24 h-24 rounded-[32px] border-2 border-white/10 p-1 bg-white/5 shadow-2xl">
+                  <div className="w-full h-full rounded-[24px] bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                     {avatarUrl ? (
+                       <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                     ) : (
+                       <UserCircle size={48} className="text-white/20" />
+                     )}
+                  </div>
+               </div>
+               <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleFileChange}
+               />
+               <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="text-[10px] font-black text-white/40 hover:text-white flex items-center gap-2 uppercase tracking-widest transition-all"
+               >
+                  <Camera size={14} />
+                  Ganti Foto Profil
+               </button>
+            </div>
 
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Nama Profile</label>
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-white/30 uppercase tracking-widest ml-1">Nama Profile</label>
               <input 
                 type="text"
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 transition-all font-sans"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm font-black text-white outline-none focus:bg-white/10 transition-all"
                 value={name}
                 onChange={e => setName(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="h-[1px] bg-white/10 w-full" />
+
+          {/* Locations Management Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h4 className="text-[10px] font-black text-white uppercase tracking-[0.2em] mb-1">Daftar Lokasi</h4>
+              <span className="text-[9px] font-black text-white/20 bg-white/5 px-2 py-0.5 rounded-md">{profileSubs.length}</span>
+            </div>
+
+            <div className="space-y-2">
+               {profileSubs.map(sub => (
+                 <div key={sub.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 group">
+                    <div className="flex items-center gap-3">
+                       <MapPin size={14} className="text-white/40 group-hover:text-white transition-colors" />
+                       <span className="text-xs font-black text-white uppercase truncate max-w-[150px]">{sub.name}</span>
+                    </div>
+                    <button 
+                      onClick={() => onDeleteSub(sub)}
+                      className="w-8 h-8 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all border border-red-500/10"
+                    >
+                       <Trash2 size={14} />
+                    </button>
+                 </div>
+               ))}
+
+               {/* Add Sub Form Inside Modal */}
+               <div className="pt-2">
+                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      placeholder="SUB LOKASI BARU..."
+                      className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-[10px] font-black text-white outline-none focus:bg-white/10 placeholder:text-white/10 transition-all uppercase"
+                      value={newSubName}
+                      onChange={e => setNewSubName(e.target.value)}
+                    />
+                    <button 
+                      disabled={!newSubName.trim()}
+                      onClick={() => {
+                        addSub(newSubName, profile.id);
+                        setNewSubName('');
+                      }}
+                      className="bg-white text-black px-4 rounded-2xl font-black text-[10px] disabled:opacity-20 transition-all active:scale-95"
+                    >
+                      TAMBAH
+                    </button>
+                  </div>
+               </div>
+            </div>
+          </div>
+
+          <div className="h-[1px] bg-white/10 w-full" />
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 pb-4">
             <button 
               onClick={() => onUpdate(name, avatarUrl)}
-              className="w-full bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+              className="w-full bg-white text-black py-4 rounded-3xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
             >
               Simpan Perubahan
             </button>
             <button 
               onClick={onDelete}
-              className="w-full py-4 text-red-500 font-black text-[11px] uppercase tracking-widest hover:bg-white/5 rounded-2xl flex items-center justify-center gap-2 transition-all"
+              className="w-full py-4 text-red-500 font-black text-[10px] uppercase tracking-widest hover:bg-red-500/10 rounded-3xl flex items-center justify-center gap-2 transition-all border border-transparent hover:border-red-500/20"
             >
-              <Trash2 size={16} />
-              Hapus Profile
+              <Trash2 size={14} />
+              Hapus Profile Selamanya
             </button>
           </div>
         </div>
@@ -1544,6 +1855,8 @@ function ProfileFormModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
                 type="text" 
                 placeholder="Contoh: Site Masamba"
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white focus:bg-white/10 outline-none transition-all"
+                onKeyDown={handleEnterNextField}
+                onBlur={e => setName(toTitleCase(e.target.value))}
                 value={name}
                 onChange={e => setName(e.target.value)}
               />
@@ -1563,7 +1876,7 @@ function ProfileFormModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
                 setIsSubmitting(true);
                 onSubmit(name, avatarUrl);
               }}
-              className="flex-1 py-4 bg-white/90 backdrop-blur-md text-ig-blue rounded-2xl text-[11px] font-black shadow-xl uppercase tracking-widest active:scale-95 transition-all"
+              className="flex-1 py-4 bg-white/90 backdrop-blur-md text-black rounded-2xl text-[11px] font-black shadow-xl uppercase tracking-widest active:scale-95 transition-all"
             >
               {isSubmitting ? 'Proses...' : 'Simpan'}
             </button>
@@ -1601,6 +1914,8 @@ function SubFormModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (n
               type="text" 
               placeholder="Contoh: BLOK A"
               className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 transition-all"
+              onKeyDown={handleEnterNextField}
+              onBlur={e => setName(toTitleCase(e.target.value))}
               value={name}
               onChange={e => setName(e.target.value)}
             />
@@ -1619,7 +1934,7 @@ function SubFormModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (n
                 setIsSubmitting(true);
                 onSubmit(name);
               }}
-              className="flex-1 py-4 bg-white/90 backdrop-blur-md text-ig-blue rounded-2xl text-[11px] font-black shadow-xl uppercase tracking-widest active:scale-95 transition-all"
+              className="flex-1 py-4 bg-white/90 backdrop-blur-md text-black rounded-2xl text-[11px] font-black shadow-xl uppercase tracking-widest active:scale-95 transition-all"
             >
               {isSubmitting ? 'Proses...' : 'Tambah Sub'}
             </button>
@@ -1692,7 +2007,7 @@ function ReceiveOrderModal({ onClose, request, onConfirm }: {
 
         <button 
           onClick={() => onConfirm({ recipient, deliverer })}
-          className="w-full bg-white/90 backdrop-blur-md text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all mb-4"
+          className="w-full bg-white/90 backdrop-blur-md text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all mb-4"
         >
           Konfirmasi Diterima
         </button>
@@ -1705,14 +2020,28 @@ function ReceiveOrderModal({ onClose, request, onConfirm }: {
   );
 }
 
-function FundsView({ subId }: { subId: string }) {
-  const { fieldFunds = [], addFieldFundEntry, deleteFieldFundEntry } = useApp();
-  const [showAdd, setShowAdd] = useState(false);
+function FundsView({ 
+  subId, 
+  showAdd, 
+  setShowAdd, 
+  viewingNota, 
+  setViewingNota 
+}: { 
+  subId: string;
+  showAdd: boolean;
+  setShowAdd: (v: boolean) => void;
+  viewingNota: any;
+  setViewingNota: (v: any) => void;
+}) {
+  const { fieldFunds = [], addFieldFundEntry, deleteFieldFundEntry, profiles = [], subs = [], activeProfileId } = useApp();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [viewingNota, setViewingNota] = useState<any>(null);
   
   const subFunds = fieldFunds.filter(f => f.subId === subId).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
   const lastNotaNo = subFunds.length > 0 ? subFunds[0].notaNo : '';
+
+  const activeProfile = profiles.find(p => p.id === activeProfileId);
+  const activeSub = subs.find(s => s.id === subId);
+  const locationName = activeSub ? activeSub.name : 'Project';
 
   const toggleSelect = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -1757,23 +2086,27 @@ function FundsView({ subId }: { subId: string }) {
     const selectedEntries = subFunds.filter(f => selectedIds.includes(f.id));
     if (selectedEntries.length === 0) return alert('Pilih nota yang ingin dikirim');
 
-    let message = `*LAPORAN DANA LAPANGAN*\n`;
-    message += `Sub Lokasi: ${subId}\n`;
-    message += `--------------------------\n\n`;
-
-    selectedEntries.forEach((nota, idx) => {
-      message += `*${idx + 1}. Nota: ${nota.notaNo}* (${nota.tanggal})\n`;
+    let message = '';
+    
+    selectedEntries.forEach((nota) => {
+      // Bold header: Dana Lapangan (Nota) (Lokasi)
+      message += `*Dana Lapangan ${nota.notaNo} ${locationName}*\n\n`;
       nota.items.forEach((item: any) => {
-        message += `- ${item.uraian} (${item.klasifikasi}): ${item.jumlah} ${item.satuan} @ Rp ${item.hargaSatuan.toLocaleString()} = *Rp ${item.hargaTotal.toLocaleString()}*\n`;
+        // Quoted items: (Daftar Item) (Jumlah) (Satuan)
+        message += `> ${item.uraian} ${item.jumlah} ${item.satuan}\n`;
       });
-      message += `_Total Nota: Rp ${nota.totalNota.toLocaleString()}_\n\n`;
+      // Inline code total
+      message += `\`Total RP ${(nota.totalNota || 0).toLocaleString()}\`\n\n`;
     });
     
-    const totalSemua = selectedEntries.reduce((acc, n) => acc + (n.totalNota || 0), 0);
-    message += `--------------------------\n`;
-    message += `*TOTAL KESELURUHAN: Rp ${totalSemua.toLocaleString()}*`;
+    if (selectedEntries.length > 1) {
+      const totalSemua = selectedEntries.reduce((acc, n) => acc + (n.totalNota || 0), 0);
+      message += `--------------------------\n`;
+      message += `*TOTAL KESELURUHAN: Rp ${totalSemua.toLocaleString()}*`;
+    }
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
   };
 
   return (
@@ -1815,7 +2148,7 @@ function FundsView({ subId }: { subId: string }) {
               if (!subId) return alert('Pilih sub lokasi terlebih dahulu');
               setShowAdd(true);
             }}
-            className="bg-white/90 backdrop-blur-md text-ig-blue w-9 h-9 rounded-xl flex items-center justify-center shadow-xl transition-all active:scale-90"
+            className="bg-white/90 backdrop-blur-md text-black w-9 h-9 rounded-xl flex items-center justify-center shadow-xl transition-all active:scale-90"
           >
             <Plus size={22} strokeWidth={4} />
           </button>
@@ -1853,7 +2186,7 @@ function FundsView({ subId }: { subId: string }) {
                           onClick={(e) => toggleSelect(nota.id, e)}
                           className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
                             selectedIds.includes(nota.id) 
-                            ? 'bg-white border-white text-ig-blue shadow-lg' 
+                            ? 'bg-white border-white text-black shadow-lg' 
                             : 'bg-transparent border-white/20 text-transparent group-hover:border-white/50'
                           }`}
                          >
@@ -1884,77 +2217,77 @@ function FundsView({ subId }: { subId: string }) {
       <AnimatePresence>
         {viewingNota && (
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 text-left" onClick={() => setViewingNota(null)}>
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              onClick={e => e.stopPropagation()}
-              className="bg-white/10 backdrop-blur-xl w-full max-w-md rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col border border-white/20"
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-black/95 backdrop-blur-xl w-full max-w-sm rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col border border-white/20"
+      >
+        <div className="bg-white/5 p-8 pb-12 relative overflow-hidden border-b border-white/10">
+          <Landmark size={120} className="absolute -right-10 -bottom-10 text-white/10 -rotate-12 pointer-events-none" />
+          <div className="relative z-10 flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-black text-white leading-none tracking-tight">Detail Nota</h3>
+              <p className="text-[10px] font-black text-white/80 uppercase tracking-[0.2em] mt-2">Doodle Dana Report</p>
+            </div>
+            <button onClick={() => setViewingNota(null)} className="w-10 h-10 rounded-2xl bg-white/20 border border-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all"><X size={24} /></button>
+          </div>
+        </div>
+
+        <div className="px-8 -mt-6 relative z-20">
+          <div className="bg-white/10 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/20 p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">No. Nota</p>
+                <p className="text-sm font-black text-white">#{viewingNota.notaNo}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Tanggal</p>
+                <p className="text-sm font-black text-white/90">{viewingNota.tanggal}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-[9px] font-black text-white/50 uppercase tracking-widest border-b border-white/10 pb-2">Rincian Item</p>
+              <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                 {viewingNota.items.map((item: any, idx: number) => (
+                   <div key={idx} className="flex flex-col gap-1.5 border-b border-white/5 pb-3 last:border-0">
+                     <div className="flex items-center justify-between">
+                       <span className="text-xs font-black text-white">{item.uraian}</span>
+                       <span className="text-[8px] font-black px-2 py-0.5 rounded-lg bg-white/10 text-white/70 uppercase tracking-wider">{item.klasifikasi || 'BAHAN'}</span>
+                     </div>
+                     <div className="flex items-center justify-between text-[11px] font-bold text-white/50">
+                       <span className="opacity-60">{item.jumlah} {item.satuan} @ {item.hargaSatuan.toLocaleString()}</span>
+                       <span className="text-white font-black italic">RP {item.hargaTotal.toLocaleString()}</span>
+                     </div>
+                   </div>
+                 ))}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t-2 border-dashed border-white/10">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-black text-white/50 uppercase tracking-widest">Total Bayar</p>
+                <p className="text-xl font-black text-white italic">RP {viewingNota.totalNota.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => {
+                if (confirm('Hapus rincian nota ini?')) {
+                  deleteFieldFundEntry(viewingNota.id);
+                  setViewingNota(null);
+                }
+              }}
+              className="w-full py-4 text-[10px] font-black text-red-400 hover:text-red-300 uppercase tracking-[0.2em] hover:bg-white/5 transition-all rounded-2xl flex items-center justify-center gap-2"
             >
-              <div className="bg-white/5 p-8 pb-12 relative overflow-hidden border-b border-white/10">
-                <Landmark size={120} className="absolute -right-10 -bottom-10 text-white/10 -rotate-12 pointer-events-none" />
-                <div className="relative z-10 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-black text-white leading-none tracking-tight">Detail Nota</h3>
-                    <p className="text-[10px] font-black text-white/80 uppercase tracking-[0.2em] mt-2">Doodle Dana Report</p>
-                  </div>
-                  <button onClick={() => setViewingNota(null)} className="w-10 h-10 rounded-2xl bg-white/20 border border-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all"><X size={24} /></button>
-                </div>
-              </div>
-
-              <div className="px-8 -mt-6 relative z-20">
-                <div className="bg-white/5 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/20 p-6 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">No. Nota</p>
-                      <p className="text-sm font-black text-white">#{viewingNota.notaNo}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Tanggal</p>
-                      <p className="text-sm font-black text-white/90">{viewingNota.tanggal}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <p className="text-[9px] font-black text-white/50 uppercase tracking-widest border-b border-white/10 pb-2">Rincian Item</p>
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                       {viewingNota.items.map((item: any, idx: number) => (
-                         <div key={idx} className="flex flex-col gap-1.5 border-b border-white/5 pb-3 last:border-0">
-                           <div className="flex items-center justify-between">
-                             <span className="text-xs font-black text-white">{item.uraian}</span>
-                             <span className="text-[8px] font-black px-2 py-0.5 rounded-lg bg-white/10 text-white/70 uppercase tracking-wider">{item.klasifikasi || 'BAHAN'}</span>
-                           </div>
-                           <div className="flex items-center justify-between text-[11px] font-bold text-white/50">
-                             <span className="opacity-60">{item.jumlah} {item.satuan} @ {item.hargaSatuan.toLocaleString()}</span>
-                             <span className="text-white font-black italic">RP {item.hargaTotal.toLocaleString()}</span>
-                           </div>
-                         </div>
-                       ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t-2 border-dashed border-white/10">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-black text-white/50 uppercase tracking-widest">Total Bayar</p>
-                      <p className="text-xl font-black text-white italic">RP {viewingNota.totalNota.toLocaleString()}</p>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={() => {
-                      if (confirm('Hapus rincian nota ini?')) {
-                        deleteFieldFundEntry(viewingNota.id);
-                        setViewingNota(null);
-                      }
-                    }}
-                    className="w-full py-4 text-[10px] font-black text-red-400 hover:text-red-300 uppercase tracking-[0.2em] hover:bg-white/5 transition-all rounded-2xl flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={16} /> Hapus Selamanya
-                  </button>
-                </div>
-              </div>
-              <div className="h-8" />
-            </motion.div>
+              <Trash2 size={16} /> Hapus Selamanya
+            </button>
+          </div>
+        </div>
+        <div className="h-8" />
+      </motion.div>
           </div>
         )}
       </AnimatePresence>
@@ -1967,6 +2300,13 @@ function FundsView({ subId }: { subId: string }) {
             onClose={() => setShowAdd(false)}
             onSubmit={(entry: any) => {
               addFieldFundEntry(entry);
+              
+              // New format: Bold Header (Nota first then Location), Quoted Items, Entire Total line as inline code
+              const msg = `*Dana Lapangan ${entry.notaNo} ${locationName}*\n\n` + 
+                          entry.items.map((i: any) => `> ${i.uraian} ${i.jumlah} ${i.satuan}`).join('\n') + 
+                          `\n\`Total RP ${(entry.totalNota || 0).toLocaleString()}\``;
+              
+              window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
               setShowAdd(false);
             }}
           />
@@ -2017,7 +2357,7 @@ function ProfileManagementView({
               }`}>{prof.name}</span>
               
               {activeProfileId === prof.id && (
-                <div className="absolute top-0 right-0 -mr-1 -mt-1 w-6 h-6 bg-white text-ig-blue rounded-full flex items-center justify-center shadow-md animate-bounce">
+                <div className="absolute top-0 right-0 -mr-1 -mt-1 w-6 h-6 bg-white text-black rounded-full flex items-center justify-center shadow-md animate-bounce">
                   <CheckCircle2 size={14} strokeWidth={3} />
                 </div>
               )}
@@ -2046,7 +2386,7 @@ function ProfileManagementView({
   );
 }
 
-function ProfileSelectionModal({ profiles, onSelect, onAdd, getProfileAvatar }: any) {
+function ProfileSelectionModal({ profiles, onSelect, onAdd, getProfileAvatar, onEdit }: any) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <motion.div 
@@ -2081,7 +2421,7 @@ function ProfileSelectionModal({ profiles, onSelect, onAdd, getProfileAvatar }: 
                <p className="text-white/40 text-[11px] mb-8 font-medium">Tambahkan lokasi proyek pertama Anda untuk mulai mengelola</p>
                <button 
                 onClick={onAdd}
-                className="w-full bg-white text-ig-blue py-4 rounded-2xl font-black text-sm shadow-xl flex items-center justify-center gap-3 transition-transform active:scale-95"
+                className="w-full bg-white text-black py-4 rounded-2xl font-black text-sm shadow-xl flex items-center justify-center gap-3 transition-transform active:scale-95"
                >
                  <Plus size={20} strokeWidth={4} />
                  TAMBAH LOKASI
@@ -2090,22 +2430,35 @@ function ProfileSelectionModal({ profiles, onSelect, onAdd, getProfileAvatar }: 
           ) : (
             <div className="grid grid-cols-2 gap-6">
               {profiles.map((prof: any) => (
-                <button
-                  key={prof.id}
-                  onClick={() => onSelect(prof.id)}
-                  className="flex flex-col items-center gap-3 active:scale-95 transition-all text-center group"
-                >
-                  <div className="w-24 h-24 rounded-3xl overflow-hidden flex items-center justify-center bg-white/5 border border-white/10 shadow-lg group-hover:scale-105 transition-all">
-                    {getProfileAvatar(prof)}
-                  </div>
-                  <span className="text-[11px] font-black uppercase tracking-widest truncate w-full text-white">{prof.name}</span>
-                </button>
+                <div key={prof.id} className="relative group">
+                  <button
+                    onClick={() => onSelect(prof.id)}
+                    className="flex flex-col items-center gap-3 active:scale-95 transition-all text-center w-full"
+                  >
+                    <div className="w-24 h-24 rounded-[32px] overflow-hidden flex items-center justify-center bg-white/5 border border-white/10 shadow-lg group-hover:scale-105 transition-all p-1">
+                      <div className="w-full h-full rounded-[24px] overflow-hidden">
+                        {getProfileAvatar(prof)}
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-black uppercase tracking-widest truncate w-full text-white">{prof.name}</span>
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(prof);
+                    }}
+                    className="absolute top-0 right-0 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/40 hover:text-white transition-all opacity-0 group-hover:opacity-100 z-10"
+                    title="Manage Profile & Locations"
+                  >
+                    <Settings size={14} />
+                  </button>
+                </div>
               ))}
               <button 
                 onClick={onAdd}
                 className="flex flex-col items-center gap-3 active:scale-95 transition-all group"
               >
-                <div className="w-24 h-24 rounded-3xl flex items-center justify-center border-2 border-dashed border-white/10 bg-transparent text-white/20 hover:text-white/40 transition-all">
+                <div className="w-24 h-24 rounded-[32px] flex items-center justify-center border-2 border-dashed border-white/10 bg-transparent text-white/20 hover:text-white/40 transition-all">
                   <Plus size={32} />
                 </div>
                 <span className="text-[11px] font-bold text-white/40 uppercase tracking-widest">Baru</span>
@@ -2176,13 +2529,11 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
     (item as any)[field] = val;
     
     // Logic: Always keep Harga Satuan updated if it's derived from Total and Qty
-    // This handles both order of entry: Total first or Qty first
     const qty = parseFloat(item.jumlah as any) || 0;
     const total = parseFloat(item.hargaTotal as any) || 0;
     
     if (qty > 0) {
       if (field === 'hargaTotal' || field === 'jumlah') {
-        // Round to 2 decimals to prevent long floating point issues that look like millions in some locales
         item.hargaSatuan = Math.round((total / qty) * 100) / 100;
       }
     } else {
@@ -2194,22 +2545,27 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
   };
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[250] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[999] flex justify-center items-start overflow-y-auto custom-scrollbar p-6">
       <motion.div 
-        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        initial={{ scale: 0.95, opacity: 0, y: -50 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[40px] shadow-2xl relative border border-white/20 max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-black/95 backdrop-blur-2xl w-full max-w-sm rounded-[32px] shadow-2xl relative border border-white/10 my-4 flex flex-col"
       >
-        <div className="px-8 pt-8 pb-4 relative z-10 flex items-center justify-between">
-          <div>
-            <h3 className="text-xl font-black text-white tracking-tight leading-none">Petty Cash</h3>
-            <p className="text-[9px] text-white/60 font-black uppercase tracking-[0.2em] mt-1">Laporan Dana Lapangan</p>
+        <div className="px-5 pt-5 pb-1 relative z-10 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white">
+              <Banknote size={16} />
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-white tracking-tight leading-none uppercase">Dana Lapangan</h3>
+              <p className="text-[8px] text-white/40 font-black uppercase tracking-widest mt-1">Input Nota Baru</p>
+            </div>
           </div>
           <button 
             onClick={onClose} 
-            className="w-10 h-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all"
+            className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
@@ -2220,132 +2576,136 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
           onSubmit({ ...form, items: validItems });
         }} className="flex-1 flex flex-col min-h-0 relative z-10">
           
-          <div className="px-8 pb-6 space-y-4 overflow-y-auto custom-scrollbar pt-2 pb-20">
-            {/* Header Inputs Section */}
+          <div className="px-5 pb-4 space-y-3 overflow-y-auto custom-scrollbar pt-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">No. Nota</label>
+                <label className="text-[8px] font-black text-white/40 uppercase tracking-widest ml-1">No. Nota</label>
                 <input 
                   required
                   type="text" 
-                  className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white placeholder:text-white/30 focus:bg-white/10 outline-none transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-black text-white placeholder:text-white/20 focus:bg-white/10 outline-none transition-all"
+                  onKeyDown={handleEnterNextField}
                   value={form.notaNo}
                   onChange={e => setForm({...form, notaNo: e.target.value})}
                   placeholder="000"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Tanggal</label>
+                <label className="text-[8px] font-black text-white/40 uppercase tracking-widest ml-1">Tanggal</label>
                 <input 
                   required
                   type="date" 
-                  className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none transition-all color-scheme-dark"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-[11px] font-black text-white outline-none transition-all color-scheme-dark"
+                  onKeyDown={handleEnterNextField}
                   value={form.tanggal}
                   onChange={e => setForm({...form, tanggal: e.target.value})}
                 />
               </div>
             </div>
 
-            {/* Items List Section */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between px-1">
-                <p className="text-[9px] font-black text-white uppercase tracking-widest">Daftar Item</p>
+                <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Item Nota</p>
                 <button 
                   type="button"
                   onClick={addItem}
-                  className="flex items-center gap-1.5 text-[8px] font-black text-white uppercase tracking-widest bg-white/10 px-3 py-2 rounded-xl border border-white/20 hover:bg-white/20 transition-all active:scale-95"
+                  className="text-[8px] font-black text-white uppercase tracking-widest bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/20 transition-all active:scale-95"
                 >
-                  <Plus size={12} strokeWidth={4} /> Tambah
+                  + Tambah
                 </button>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-3 pb-32">
                 {form.items.map((item, idx) => (
-                  <div key={idx} className="p-6 bg-transparent border border-white/20 rounded-[32px] relative shadow-lg">
+                  <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-2xl relative shadow-sm">
                     {form.items.length > 1 && (
                       <button 
                         type="button"
                         onClick={() => removeItem(idx)}
-                        className="absolute -top-1 -right-1 w-7 h-7 bg-white/10 text-white rounded-xl flex items-center justify-center border border-white/20 shadow-md active:scale-90 transition-all hover:bg-red-500"
+                        className="absolute -top-1 -right-1 w-7 h-7 bg-red-500 text-white rounded-xl flex items-center justify-center shadow-lg active:scale-95 transition-all"
                       >
                         <Trash2 size={14} />
                       </button>
                     )}
 
-                    <div className="space-y-4">
-                      {/* Slim Single Column Vertical Inputs as requested */}
+                    <div className="space-y-3">
                       <div className="space-y-1">
-                        <label className="text-[8px] font-black text-white/60 uppercase tracking-widest ml-1">Uraian</label>
+                        <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Uraian Pekerjaan / Material</label>
                         <input 
                           type="text" 
                           required
-                          className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-xs font-black text-white outline-none transition-all" 
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
+                          onKeyDown={handleEnterNextField}
+                          onBlur={e => updateItem(idx, 'uraian', toTitleCase(e.target.value))}
                           value={item.uraian}
                           onChange={e => updateItem(idx, 'uraian', e.target.value)}
-                          placeholder="Nama Barang..."
+                          placeholder="..."
                         />
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-white/60 uppercase tracking-widest ml-1">Klasifikasi</label>
-                        <div className="flex gap-2">
-                          {['BAHAN', 'ALAT', 'JASA'].map((k) => (
-                            <button
-                              key={k}
-                              type="button"
-                              onClick={() => updateItem(idx, 'klasifikasi', k)}
-                              className={`flex-1 py-2 rounded-xl text-[9px] font-black transition-all border ${
-                               item.klasifikasi === k 
-                               ? 'bg-white text-ig-blue border-white shadow-lg' 
-                               : 'bg-transparent text-white border-white/20 hover:bg-white/10'
-                             }`}
-                            >
-                              {k}
-                            </button>
-                          ))}
-                        </div>
+                      <div className="flex gap-1.5">
+                        {['BAHAN', 'ALAT', 'JASA'].map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => updateItem(idx, 'klasifikasi', k)}
+                            className={`flex-1 py-1.5 rounded-xl text-[8px] font-black transition-all border ${
+                              item.klasifikasi === k 
+                              ? 'bg-white text-black border-white shadow-lg' 
+                              : 'bg-transparent text-white/20 border-white/5'
+                            }`}
+                          >
+                            {k}
+                          </button>
+                        ))}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[8px] font-black text-white/60 uppercase tracking-widest ml-1">Satuan</label>
-                          <input 
-                            type="text" 
-                            required
-                            className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none" 
-                            value={item.satuan}
-                            onChange={e => updateItem(idx, 'satuan', e.target.value)}
-                            placeholder="ZAK/KG/LTR"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[8px] font-black text-white/60 uppercase tracking-widest ml-1">Volume</label>
+                          <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Jumlah</label>
                           <input 
                             type="number" 
                             required
-                            className="w-full bg-transparent border border-white/20 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none" 
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
+                            onKeyDown={handleEnterNextField}
+                            onFocus={e => e.target.select()}
                             value={item.jumlah === 0 ? '' : item.jumlah}
                             onChange={e => updateItem(idx, 'jumlah', parseFloat(e.target.value) || 0)}
                             placeholder="0"
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Satuan</label>
+                          <input 
+                            type="text" 
+                            required
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
+                            onKeyDown={handleEnterNextField}
+                            onBlur={e => updateItem(idx, 'satuan', toTitleCase(e.target.value))}
+                            value={item.satuan}
+                            onChange={e => updateItem(idx, 'satuan', e.target.value)}
+                            placeholder="Satuan"
+                          />
+                        </div>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[8px] font-black text-white uppercase tracking-widest ml-1">Total Bayar (RP)</label>
+                        <label className="text-[8px] font-black text-white/50 uppercase tracking-widest">Total Harga (Rp)</label>
                         <input 
                           type="number" 
                           required
-                          className="w-full bg-transparent border border-white/20 p-4 rounded-2xl text-sm font-black text-white outline-none shadow-xl transition-all active:scale-95 placeholder:text-white/30" 
+                          className="w-full bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-sm font-black text-white outline-none focus:bg-white/10 transition-all font-mono" 
+                          onKeyDown={handleEnterNextField}
+                          onFocus={e => e.target.select()}
                           value={item.hargaTotal === 0 ? '' : item.hargaTotal}
                           onChange={e => updateItem(idx, 'hargaTotal', parseFloat(e.target.value) || 0)}
-                          placeholder="RP 0"
+                          placeholder="0"
                         />
                       </div>
 
-                      <div className="flex items-center justify-between px-2 text-[9px] font-black text-white/80 italic">
+                      <div className="flex items-center justify-between px-1 text-[8px] font-black text-white/30 italic uppercase tracking-wider">
                         <span>Hrg Satuan</span>
-                        <span>RP {item.hargaSatuan.toLocaleString('id-ID', { maximumFractionDigits: 2 })}</span>
+                        <span>RP {item.hargaSatuan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                       </div>
                     </div>
                   </div>
@@ -2354,21 +2714,21 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
             </div>
           </div>
 
-          <div className="p-8 bg-white/10 backdrop-blur-xl border-t border-white/20 flex flex-col gap-4 mt-auto">
-             <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                   <p className="text-[9px] font-black text-white/70 uppercase tracking-widest leading-none">Ringkasan Total</p>
-                   <p className="text-2xl font-black italic text-white leading-none">RP {form.totalNota.toLocaleString()}</p>
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-2xl border-t border-white/10 flex flex-col gap-3 rounded-b-[32px]">
+             <div className="flex items-center justify-between px-1">
+                <div className="space-y-0.5">
+                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Total Nota</p>
+                   <p className="text-lg font-black italic text-white leading-none">RP {form.totalNota.toLocaleString()}</p>
                 </div>
-                <div className="w-12 h-12 rounded-2xl bg-white/90 backdrop-blur-md flex items-center justify-center text-ig-blue shadow-lg">
-                   <CheckCircle2 size={24} />
+                <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center shadow-2xl">
+                   <Check size={20} strokeWidth={4} />
                 </div>
              </div>
              <button 
               type="submit"
-              className="w-full bg-white/90 backdrop-blur-md text-ig-blue py-4 rounded-2xl font-black text-sm shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3"
+              className="w-full bg-white text-black py-4 rounded-2xl font-black text-[11px] shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
              >
-               <Send size={18} fill="currentColor" /> SIMPAN TRANSAKSI
+               <Send size={14} fill="currentColor" /> Simpan Nota
              </button>
           </div>
         </form>

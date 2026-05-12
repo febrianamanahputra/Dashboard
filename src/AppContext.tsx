@@ -38,7 +38,7 @@ interface AppContextType {
   removeProfile: (id: string) => void;
   addSub: (name: string, profileId: string) => void;
   updateSub: (id: string, name: string) => void;
-  removeSub: (id: string) => void;
+  removeSub: (id: string, cascade?: boolean) => void;
   addMainMaterial: (name: string, unit: string) => void;
   deleteMainMaterial: (id: string) => void;
   addRequest: (request: Omit<MaterialRequest, 'id' | 'status' | 'history'>) => void;
@@ -259,11 +259,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const removeSub = async (id: string) => {
+  const removeSub = async (id: string, cascade: boolean = false) => {
     try {
       const sub = subs.find(s => s.id === id);
+      if (!sub) return;
+
+      if (cascade) {
+        // 1. Delete associated requests
+        const reqsToDelete = requests.filter(r => r.subId === id);
+        const reqPromises = reqsToDelete.map(r => deleteDoc(doc(db, 'requests', r.id)));
+        
+        // 2. Delete associated field funds
+        const fundsToDelete = fieldFunds.filter(f => f.subId === id);
+        const fundPromises = fundsToDelete.map(f => deleteDoc(doc(db, 'fieldFunds', f.id)));
+
+        // 3. Delete Stock (Subcollection)
+        const stockSnapshot = await getDocs(collection(db, `subs/${id}/stock`));
+        const stockPromises = stockSnapshot.docs.map(d => deleteDoc(d.ref));
+
+        // 4. Delete RAP Data (Subcollection)
+        const rapSnapshot = await getDocs(collection(db, `subs/${id}/rapData`));
+        const rapPromises = rapSnapshot.docs.map(d => deleteDoc(d.ref));
+
+        // 5. Delete Report Template
+        const template = reportTemplates.find(t => t.subId === id);
+        const templatePromise = template ? [deleteDoc(doc(db, 'reportTemplates', template.id))] : [];
+
+        await Promise.all([
+          ...reqPromises,
+          ...fundPromises,
+          ...stockPromises,
+          ...rapPromises,
+          ...templatePromise
+        ]);
+      }
+
       await deleteDoc(doc(db, 'subs', id));
-      addNotification(`Sub Lokasi ${sub?.name} dihapus`, 'SM', 'info');
+      addNotification(`Sub Lokasi ${sub.name} dihapus ${cascade ? 'beserta seluruh data terkait' : ''}`, 'SM', 'info');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `subs/${id}`);
     }

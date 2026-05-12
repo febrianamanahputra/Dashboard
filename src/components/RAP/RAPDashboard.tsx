@@ -5,6 +5,41 @@ import { FileSpreadsheet, Download, Upload, Trash2, Package, ArrowLeft, Plus, X 
 import * as XLSX from 'xlsx';
 import { RAPItem, StockEntry } from '../../types';
 
+const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
+  if (e.key === 'Enter' && e.currentTarget.tagName !== 'TEXTAREA') {
+    const form = (e.currentTarget as HTMLInputElement).form;
+    if (form) {
+      e.preventDefault();
+      const elements = Array.from(form.elements) as HTMLElement[];
+      const index = elements.indexOf(e.currentTarget as any);
+      if (index > -1) {
+        let nextIndex = index + 1;
+        while (elements[nextIndex]) {
+          const nextElement = elements[nextIndex];
+          if (
+            (nextElement.tagName === 'INPUT' || nextElement.tagName === 'SELECT') &&
+            !(nextElement as any).disabled &&
+            (nextElement as any).type !== 'hidden' &&
+            (nextElement as any).type !== 'submit'
+          ) {
+            nextElement.focus();
+            return;
+          }
+          if (nextElement.tagName === 'BUTTON' && (nextElement as any).type === 'submit') {
+            nextElement.focus();
+            return;
+          }
+          nextIndex++;
+        }
+      }
+    }
+  }
+};
+
+const toTitleCase = (str: string) => {
+  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+};
+
 interface RAPDashboardProps {
   onBack?: () => void;
   subId: string;
@@ -259,12 +294,14 @@ export default function RAPDashboard({ onBack, subId, stock }: RAPDashboardProps
                         type="number"
                         value={requestQty}
                         onChange={(e) => setRequestQty(e.target.value)}
+                        onFocus={e => e.target.select()}
+                        onKeyDown={handleEnterNextField}
                         placeholder="0"
                         className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 transition-all"
                         autoFocus
                       />
                       {requestQty && (
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-white text-ig-blue px-2 py-0.5 rounded-lg text-[9px] font-black">
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-white text-black px-2 py-0.5 rounded-lg text-[9px] font-black">
                           {calculatePercentage()}%
                         </div>
                       )}
@@ -276,6 +313,7 @@ export default function RAPDashboard({ onBack, subId, stock }: RAPDashboardProps
                      <input 
                       type="date" 
                       className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 transition-all color-scheme-dark"
+                      onKeyDown={handleEnterNextField}
                       value={dateNeeded}
                       onChange={e => setDateNeeded(e.target.value)}
                     />
@@ -284,7 +322,7 @@ export default function RAPDashboard({ onBack, subId, stock }: RAPDashboardProps
                   <button 
                     onClick={submitRequest}
                     disabled={!requestQty || Number(requestQty) <= 0 || isSubmitting}
-                    className="w-full mt-4 bg-white text-ig-blue py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-30"
+                    className="w-full mt-4 bg-white text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-30"
                   >
                     {isSubmitting ? 'Calibrating...' : 'Deploy Request'}
                   </button>

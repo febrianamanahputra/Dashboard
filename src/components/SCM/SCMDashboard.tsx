@@ -4,6 +4,41 @@ import { useApp } from '../../AppContext';
 import { Truck, Package, Clock, CheckCircle2, CreditCard, ChevronRight, Pause, Play, X, Send, History, Check, AlertTriangle, Trash2, Plus, RefreshCw, FileSpreadsheet, Wallet } from 'lucide-react';
 import { RequestStatus, MaterialRequest } from '../../types';
 
+const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
+  if (e.key === 'Enter' && e.currentTarget.tagName !== 'TEXTAREA') {
+    const form = (e.currentTarget as HTMLInputElement).form;
+    if (form) {
+      e.preventDefault();
+      const elements = Array.from(form.elements) as HTMLElement[];
+      const index = elements.indexOf(e.currentTarget as any);
+      if (index > -1) {
+        let nextIndex = index + 1;
+        while (elements[nextIndex]) {
+          const nextElement = elements[nextIndex];
+          if (
+            (nextElement.tagName === 'INPUT' || nextElement.tagName === 'SELECT') &&
+            !(nextElement as any).disabled &&
+            (nextElement as any).type !== 'hidden' &&
+            (nextElement as any).type !== 'submit'
+          ) {
+            nextElement.focus();
+            return;
+          }
+          if (nextElement.tagName === 'BUTTON' && (nextElement as any).type === 'submit') {
+            nextElement.focus();
+            return;
+          }
+          nextIndex++;
+        }
+      }
+    }
+  }
+};
+
+const toTitleCase = (str: string) => {
+  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+};
+
 export default function SCMDashboard() {
   const { 
     profiles = [],
@@ -21,6 +56,7 @@ export default function SCMDashboard() {
   const [showPaymentModal, setShowPaymentModal] = useState<MaterialRequest | null>(null);
   const [showMainMaterialModal, setShowMainMaterialModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+  const [viewingHistorySubId, setViewingHistorySubId] = useState<string | null>(null);
 
   const getStatusLabel = (s: string) => {
     switch (s) {
@@ -37,14 +73,14 @@ export default function SCMDashboard() {
 
   const getStatusColor = (s: string) => {
     switch (s) {
-      case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-      case 'processing': return 'bg-orange-50 text-orange-700 border-orange-200';
-      case 'awaiting_payment': return 'bg-purple-50 text-purple-800 border-purple-200';
-      case 'paid': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
-      case 'delivered': return 'bg-green-50 text-green-700 border-green-200';
-      case 'received': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'on_hold': return 'bg-red-50 text-red-600 border-red-200';
-      default: return 'bg-gray-50 text-ig-black border-border-ig';
+      case 'pending': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+      case 'processing': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+      case 'awaiting_payment': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+      case 'paid': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+      case 'delivered': return 'bg-green-500/10 text-green-400 border-green-500/20';
+      case 'received': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'on_hold': return 'bg-red-500/10 text-red-400 border-red-500/20';
+      default: return 'bg-white/5 text-white border-white/10';
     }
   };
 
@@ -52,45 +88,45 @@ export default function SCMDashboard() {
     switch (s) {
       case 'pending': 
         return {
-          bg: 'bg-gradient-to-br from-[#FFD700] to-[#FDB931]',
+          bg: 'bg-white/5 backdrop-blur-md border border-white/10',
           text: 'text-white',
-          badge: 'bg-white/20 text-white border-white/30',
-          watermark: <Clock size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+          badge: 'bg-white/5 text-white border-white/10',
+          watermark: <Clock size={80} className="absolute -right-4 -bottom-4 text-white/5 rotate-12" />
         };
       case 'processing':
         return {
-          bg: 'bg-gradient-to-br from-[#FF8C00] to-[#FF4500]',
-          text: 'text-white',
-          badge: 'bg-white/20 text-white border-white/30',
-          watermark: <RefreshCw size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+          bg: 'bg-gradient-to-br from-[#FF8C00]/20 to-[#FF4500]/20 backdrop-blur-md border border-orange-500/20',
+          text: 'text-orange-100',
+          badge: 'bg-orange-500/20 text-orange-200 border-orange-500/30',
+          watermark: <RefreshCw size={80} className="absolute -right-4 -bottom-4 text-orange-500/10 rotate-12" />
         };
       case 'awaiting_payment':
         return {
-          bg: 'bg-gradient-to-br from-[#2E0854] to-[#4B0082]',
-          text: 'text-white',
-          badge: 'bg-white/20 text-white border-white/30',
-          watermark: <Wallet size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+          bg: 'bg-gradient-to-br from-[#2E0854]/20 to-[#4B0082]/20 backdrop-blur-md border border-purple-500/20',
+          text: 'text-purple-100',
+          badge: 'bg-purple-500/20 text-purple-200 border-purple-500/30',
+          watermark: <Wallet size={80} className="absolute -right-4 -bottom-4 text-purple-500/10 rotate-12" />
         };
       case 'paid':
         return {
-          bg: 'bg-gradient-to-br from-[#8A2BE2] to-[#B06AB3]',
-          text: 'text-white',
-          badge: 'bg-white/20 text-white border-white/30',
-          watermark: <CheckCircle2 size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+          bg: 'bg-gradient-to-br from-[#8A2BE2]/20 to-[#B06AB3]/20 backdrop-blur-md border border-indigo-500/20',
+          text: 'text-indigo-100',
+          badge: 'bg-indigo-500/20 text-indigo-200 border-indigo-500/30',
+          watermark: <CheckCircle2 size={80} className="absolute -right-4 -bottom-4 text-indigo-500/10 rotate-12" />
         };
       case 'delivered':
         return {
-          bg: 'bg-gradient-to-br from-[#25D366] to-[#128C7E]',
-          text: 'text-white',
-          badge: 'bg-white/20 text-white border-white/30',
-          watermark: <Truck size={80} className="absolute -right-4 -bottom-4 text-white/10 rotate-12" />
+          bg: 'bg-gradient-to-br from-[#25D366]/20 to-[#128C7E]/20 backdrop-blur-md border border-green-500/20',
+          text: 'text-green-100',
+          badge: 'bg-green-500/20 text-green-200 border-green-500/30',
+          watermark: <Truck size={80} className="absolute -right-4 -bottom-4 text-green-500/10 rotate-12" />
         };
       default:
         return {
-          bg: 'bg-white',
-          text: 'text-ig-black',
-          badge: 'bg-gray-100 text-gray-600 border-gray-200',
-          watermark: <Package size={80} className="absolute -right-4 -bottom-4 text-black/5 rotate-12" />
+          bg: 'bg-white/5 backdrop-blur-md border border-white/10',
+          text: 'text-white',
+          badge: 'bg-white/5 text-white border-white/10',
+          watermark: <Package size={80} className="absolute -right-4 -bottom-4 text-white/5 rotate-12" />
         };
     }
   };
@@ -121,36 +157,36 @@ export default function SCMDashboard() {
   const orphanedRequests = relevantRequests.filter(r => !subs.some(s => s.id === r.subId));
 
   return (
-    <div className="relative h-full flex flex-col bg-bg-base pt-[env(safe-area-inset-top)]">
-      <div className="relative z-10 flex flex-col h-full bg-bg-alt overflow-hidden">
-        <header className="flex flex-col px-4 py-4 bg-bg-base border-b border-border-ig shrink-0 gap-4">
+    <div className="relative h-full flex flex-col pt-[env(safe-area-inset-top)]">
+      <div className="relative z-10 flex flex-col h-full overflow-hidden">
+        <header className="flex flex-col px-4 py-4 bg-black/40 backdrop-blur-md border-b border-white/10 shrink-0 gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-bg-alt border border-border-ig flex items-center justify-center">
-                 <Truck size={20} className="text-ig-black" strokeWidth={2.5} />
+              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                 <Truck size={20} className="text-white" strokeWidth={2.5} />
               </div>
               <div>
-                 <h2 className="text-base font-black tracking-tight leading-none mb-1">Divisi SCM</h2>
-                 <p className="text-ig-grey text-[9px] font-black uppercase tracking-[0.15em]">Kontrol Suplai</p>
+                 <h2 className="text-base font-black tracking-tight leading-none mb-1 text-white">Divisi SCM</h2>
+                 <p className="text-white/40 text-[9px] font-black uppercase tracking-[0.15em]">Kontrol Suplai</p>
               </div>
             </div>
             
-            <div className="flex bg-bg-alt p-1 rounded-xl border border-border-ig">
+            <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
                <button 
-                onClick={() => setActiveTab('active')}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all ${activeTab === 'active' ? 'bg-white shadow-sm text-ig-blue overflow-hidden' : 'text-ig-grey'}`}
+                onClick={() => { setActiveTab('active'); setViewingHistorySubId(null); }}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all ${activeTab === 'active' ? 'bg-white shadow-lg text-black' : 'text-white/40'}`}
                >
                  Aktif
                </button>
                <button 
                 onClick={() => setActiveTab('history')}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all ${activeTab === 'history' ? 'bg-white shadow-sm text-ig-blue overflow-hidden' : 'text-ig-grey'}`}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all ${activeTab === 'history' ? 'bg-white shadow-lg text-black' : 'text-white/40'}`}
                >
                  Riwayat
                </button>
                <button 
                 onClick={() => setShowMainMaterialModal(true)}
-                className="ml-2 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter text-green-600 bg-green-50 border border-green-100 hover:bg-green-100 transition-all flex items-center gap-1.5"
+                className="ml-2 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter text-white bg-green-600 shadow-lg hover:bg-green-700 transition-all flex items-center gap-1.5"
                >
                  <Plus size={14} strokeWidth={3} />
                  Material
@@ -160,14 +196,14 @@ export default function SCMDashboard() {
           
           {activeTab === 'active' && (
             <div className="flex items-center gap-3">
-              <div className="flex-1 bg-white border border-border-ig rounded-2xl px-4 py-2.5 flex items-center justify-between">
-                 <p className="text-[9px] font-black text-ig-grey uppercase tracking-widest">Antrian</p>
-                 <p className="text-sm font-black italic">{relevantRequests.length}</p>
+              <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between">
+                 <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Antrian</p>
+                 <p className="text-sm font-black italic text-white">{relevantRequests.length}</p>
               </div>
 
-              <div className="flex-1 bg-white border border-ig-blue/20 rounded-2xl px-4 py-2.5 flex items-center justify-between">
-                 <p className="text-[9px] font-black text-ig-blue uppercase tracking-widest">Menunggu</p>
-                 <p className="text-sm font-black italic">{relevantRequests.filter(r => r.status === 'pending').length}</p>
+              <div className="flex-1 bg-white/10 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between">
+                 <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Menunggu</p>
+                 <p className="text-sm font-black italic text-white">{relevantRequests.filter(r => r.status === 'pending').length}</p>
               </div>
             </div>
           )}
@@ -175,12 +211,12 @@ export default function SCMDashboard() {
 
         {activeTab === 'active' ? (
           subsWithRequests.length === 0 && orphanedRequests.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
-              <div className="w-24 h-24 rounded-full border border-border-ig flex items-center justify-center mb-6 opacity-30">
-                 <Truck size={48} strokeWidth={1} />
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-12 opacity-30">
+              <div className="w-24 h-24 rounded-full border border-black/20 flex items-center justify-center mb-6">
+                 <Truck size={48} strokeWidth={1} className="text-black" />
               </div>
-              <h3 className="text-lg font-bold mb-1">Armada Stand By</h3>
-              <p className="text-ig-grey text-sm">Tidak ada protokol logistik aktif terdeteksi</p>
+              <h3 className="text-lg font-black text-black mb-1 uppercase tracking-tight">Armada Stand By</h3>
+              <p className="text-black/40 text-xs font-black uppercase tracking-widest">Tidak ada protokol logistik aktif terdeteksi</p>
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4 space-y-8">
@@ -197,12 +233,12 @@ export default function SCMDashboard() {
                     >
                       <div className="flex items-center justify-between px-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-ig-blue" />
-                          <h3 className="text-sm font-bold tracking-tight">
+                          <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_10px_white]" />
+                          <h3 className="text-sm font-black tracking-tight text-white uppercase">
                             {profile?.name} - {sub.name}
                           </h3>
                         </div>
-                        <span className="text-[10px] font-bold text-ig-grey uppercase">{sub.requests.length} Request</span>
+                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{sub.requests.length} Request</span>
                       </div>
 
                       <div className="space-y-4">
@@ -253,60 +289,136 @@ export default function SCMDashboard() {
             </div>
           )
         ) : (
-          /* History View */
-          <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4 space-y-8">
-            {historyBySub.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-20 opacity-40">
-                <History size={48} />
-                <p className="mt-4 font-bold text-xs uppercase tracking-widest">Belum Ada Riwayat</p>
+          /* History View - Modified to drill-down by location */
+          <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4">
+            {!viewingHistorySubId ? (
+              /* Location List View */
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] px-2 mb-4">Pilih Lokasi Riwayat</h3>
+                {historyBySub.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-center p-20 opacity-40">
+                    <History size={48} className="text-white" />
+                    <p className="mt-4 font-black text-[10px] uppercase tracking-widest text-white">Belum Ada Riwayat Terdeteksi</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {historyBySub.map((sub) => {
+                      const profile = profiles.find(p => p.id === sub.profileId);
+                      return (
+                        <button
+                          key={sub.id}
+                          onClick={() => setViewingHistorySubId(sub.id)}
+                          className="bg-white/5 backdrop-blur-md border border-white/10 p-5 flex items-center justify-between rounded-3xl hover:bg-white/10 transition-all active:scale-[0.98] group shadow-sm"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/40 group-hover:bg-white/10 group-hover:text-white transition-all border border-white/10">
+                              <Package size={24} />
+                            </div>
+                            <div className="text-left">
+                              <h4 className="text-sm font-black text-white italic tracking-tight uppercase leading-none mb-1">{sub.name}</h4>
+                              <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">{profile?.name}</p>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[8px] font-black text-white bg-white/10 px-2.5 py-1 rounded-lg uppercase tracking-widest border border-white/10">
+                              {sub.history.length} ITEM
+                            </span>
+                            <ChevronRight size={16} className="text-white/20 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ) : (
-              historyBySub.map(sub => {
-                const profile = profiles.find(p => p.id === sub.profileId);
-                const fullName = `${profile?.name} - ${sub.name}`;
-                return (
-                  <div key={sub.id} className="space-y-4">
-                     <div className="flex items-center gap-2 px-2">
-                        <div className="w-2 h-2 rounded-full bg-green-500" />
-                        <h3 className="text-sm font-bold tracking-tight">{fullName}</h3>
+              /* Detailed History per Sub View */
+              <div className="space-y-6">
+                {(() => {
+                  const subContent = historyBySub.find(s => s.id === viewingHistorySubId);
+                  const profile = profiles.find(p => p.id === subContent?.profileId);
+                  const fullName = `${profile?.name} - ${subContent?.name}`;
+
+                  return (
+                    <>
+                      <div className="flex items-center justify-between px-2 mb-6">
+                        <div className="flex items-center gap-4">
+                          <button 
+                            onClick={() => setViewingHistorySubId(null)}
+                            className="w-10 h-10 bg-white/10 rounded-2xl border border-white/10 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all"
+                          >
+                            <ChevronRight size={20} className="rotate-180" />
+                          </button>
+                          <div>
+                            <h3 className="text-sm font-black text-white tracking-tight uppercase">{subContent?.name}</h3>
+                            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{profile?.name}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Hapus semua riwayat untuk lokasi "${subContent?.name}"?`)) {
+                              subContent?.history.forEach(item => deleteRequest(item.id));
+                              setViewingHistorySubId(null);
+                            }
+                          }}
+                          className="flex items-center gap-1 bg-red-500/10 text-red-500 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-500/10 hover:bg-red-500 hover:text-white transition-all"
+                        >
+                          <Trash2 size={12} /> Hapus Semua
+                        </button>
                       </div>
-                      <div className="bg-white border border-border-ig rounded-2xl divide-y divide-gray-50 overflow-hidden shadow-sm">
-                          {sub.history.map((item) => (
-                            <div key={item.id} className="p-3 flex items-center justify-between active:bg-bg-alt transition-colors">
-                               <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600 border border-green-100">
-                                     <Package size={14} />
-                                  </div>
-                                  <div>
-                                     <p className="text-xs font-black tracking-tight leading-tight">{item.materialName}</p>
-                                     <p className="text-[9px] text-ig-grey font-bold uppercase tracking-tighter mt-0.5">
-                                        {new Date((item as any).receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                     </p>
-                                  </div>
-                               </div>
-                               <div className="flex items-center gap-3">
-                                  <button
-                                    onClick={() => {
-                                      syncDirectToSheet(item, fullName);
-                                      alert(`Sinkronisasi "${item.materialName}" dikirim ke Spreadsheet!`);
-                                    }}
-                                    className="p-2 rounded-xl bg-bg-alt text-ig-grey hover:text-ig-blue transition-colors"
-                                  >
-                                     <RefreshCw size={12} />
-                                  </button>
-                                  <div className="text-right">
-                                     <p className="text-sm font-black italic text-ig-black leading-none">
-                                        {item.quantity} 
-                                     </p>
-                                     <span className="text-[9px] text-ig-grey uppercase font-black">{item.unit}</span>
-                                  </div>
-                               </div>
+
+                      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[32px] divide-y divide-white/5 overflow-hidden shadow-2xl">
+                        {subContent?.history.map((item) => (
+                          <div key={item.id} className="p-5 flex items-center justify-between active:bg-white/5 transition-colors group">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400 border border-green-500/10">
+                                <Package size={18} />
+                              </div>
+                              <div>
+                                <p className="text-sm font-black tracking-tight text-white uppercase">{item.materialName}</p>
+                                <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">
+                                  {new Date((item as any).receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </p>
+                              </div>
                             </div>
-                          ))}
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="text-sm font-black italic text-white leading-none">
+                                  {item.quantity} 
+                                </p>
+                                <span className="text-[9px] text-white/40 uppercase font-black">{item.unit}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    syncDirectToSheet(item, fullName);
+                                    alert(`Sinkronisasi "${item.materialName}" dikirim ke Spreadsheet!`);
+                                  }}
+                                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-white/40 hover:text-white transition-all border border-white/5"
+                                  title="Sync to Sheet"
+                                >
+                                  <RefreshCw size={14} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Hapus riwayat "${item.materialName}"?`)) {
+                                      deleteRequest(item.id);
+                                    }
+                                  }}
+                                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all border border-red-500/10 shadow-sm"
+                                  title="Hapus Riwayat"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                  </div>
-                );
-              })
+                    </>
+                  );
+                })()}
+              </div>
             )}
           </div>
         )}
@@ -348,45 +460,43 @@ function MainMaterialModal({ materials, onAdd, onDelete, onClose }: {
   const UNITS = ['zak', 'ret', 'dus', 'Pcs', 'galon', 'm2', 'm3', 'Liter', 'Roll', 'Lembar', 'Kaleng', 'Dll'];
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 text-ig-black">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[200] flex items-center justify-center p-4">
       <motion.div 
-        initial={{ y: 100, opacity: 0 }}
+        initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-6 shadow-2xl relative border border-border-ig flex flex-col"
+        exit={{ y: 50, opacity: 0 }}
+        className="bg-black/95 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-6 shadow-2xl relative border border-white/10 flex flex-col"
       >
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-base font-bold">Daftar Material Utama</h3>
-          <button onClick={onClose} className="text-ig-grey">
-            <X size={24} />
+          <h3 className="text-base font-black text-white uppercase tracking-tight">Daftar Material</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white">
+            <X size={18} />
           </button>
         </div>
 
         <div className="space-y-4 mb-6">
            <div className="flex gap-2">
-              <div className="flex-1 space-y-1">
+              <div className="flex-1">
                  <input 
                   type="text" 
-                  placeholder="Nama Material"
-                  className="w-full bg-bg-alt border border-border-ig rounded-md px-3 py-2 text-xs font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+                  placeholder="Nama..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-black text-white focus:bg-white/10 outline-none"
                   value={name}
+                  onBlur={e => setName(toTitleCase(e.target.value))}
                   onChange={e => setName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && name.trim()) {
-                      onAdd(name, unit);
-                      setName('');
-                    }
-                  }}
+                  onKeyDown={handleEnterNextField}
                  />
               </div>
-              <div className="w-24 space-y-1">
-                 <select 
-                  className="w-full bg-bg-alt border border-border-ig rounded-md px-2 py-2 text-xs font-bold focus:ring-1 focus:ring-ig-blue outline-none"
+              <div className="w-24">
+                 <input 
+                  type="text"
+                  placeholder="Satuan"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-2 py-2.5 text-xs font-black text-white focus:bg-white/10 outline-none text-center"
+                  onKeyDown={handleEnterNextField}
+                  onBlur={e => setUnit(toTitleCase(e.target.value))}
                   value={unit}
                   onChange={e => setUnit(e.target.value)}
-                 >
-                    {UNITS.map(u => <option key={u} value={u.toLowerCase()}>{u.toUpperCase()}</option>)}
-                 </select>
+                 />
               </div>
               <button 
                 disabled={!name}
@@ -394,22 +504,22 @@ function MainMaterialModal({ materials, onAdd, onDelete, onClose }: {
                   onAdd(name, unit);
                   setName('');
                 }}
-                className="bg-ig-blue text-white px-3 py-2 rounded-md font-bold text-xs disabled:opacity-50"
+                className="bg-white text-black px-3.5 py-2.5 rounded-xl font-black text-xs disabled:opacity-30 active:scale-95 transition-all shadow-lg"
               >
-                <Plus size={16} />
+                <Plus size={18} strokeWidth={4} />
               </button>
            </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar border-t border-border-ig pt-4 space-y-2">
+        <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar border-t border-white/5 pt-4 space-y-2">
            {materials.length === 0 ? (
-             <p className="text-center text-[10px] text-ig-grey italic py-8">Belum ada material utama.</p>
+             <p className="text-center text-[10px] text-white/30 italic py-8 uppercase font-black">Belum ada material.</p>
            ) : (
              materials.map(m => (
-               <div key={m.id} className="flex items-center justify-between p-3 bg-bg-alt rounded-lg border border-border-ig">
+               <div key={m.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl shadow-sm hover:shadow-md transition-all group">
                   <div>
-                     <p className="text-xs font-bold uppercase">{m.name}</p>
-                     <p className="text-[10px] text-ig-grey font-medium uppercase tracking-widest">{m.unit}</p>
+                     <p className="text-xs font-black text-white uppercase">{m.name}</p>
+                     <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{m.unit}</p>
                   </div>
                   <button 
                     onClick={() => {
@@ -417,9 +527,9 @@ function MainMaterialModal({ materials, onAdd, onDelete, onClose }: {
                         onDelete(m.id);
                       }
                     }}
-                    className="text-red-400 hover:text-red-600 transition-colors p-2"
+                    className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
                   >
-                     <Trash2 size={16} />
+                     <Trash2 size={14} />
                   </button>
                </div>
              ))
@@ -477,11 +587,11 @@ const RequestItem: React.FC<{
   };
 
   return (
-    <div className={`border border-white/10 rounded-2xl shadow-md transition-all relative overflow-hidden ${theme.bg} mb-2`}>
+    <div className={`border border-white/10 rounded-[28px] shadow-2xl transition-all relative overflow-hidden ${theme.bg} mb-4`}>
       {theme.watermark}
       <button 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 flex items-center justify-between text-left relative z-10"
+        className="w-full p-5 flex items-center justify-between text-left relative z-10"
       >
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-sm ${theme.text}`}>
@@ -644,70 +754,80 @@ function PaymentModal({ request, locationName, onClose, onConfirm }: {
   };
 
   return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[200] flex items-center justify-center p-4">
       <motion.div 
-        initial={{ y: 100, opacity: 0 }}
+        initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }}
-        className="bg-bg-base w-full max-w-sm rounded-[24px] p-6 shadow-2xl relative border border-border-ig"
+        exit={{ y: 50, opacity: 0 }}
+        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/20"
       >
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-base font-bold">Pengajuan Pembayaran</h3>
-          <button onClick={onClose} className="text-ig-grey">
-            <X size={24} />
+          <div>
+            <h3 className="text-xl font-black text-white tracking-tight uppercase">Payment Req</h3>
+            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-1">Konfirmasi Pembayaran</p>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white border border-white/10 shadow-lg">
+            <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Lokasi</label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-[8px] font-black text-white/50 uppercase tracking-widest ml-1">Lokasi</label>
             <input 
               readOnly
               type="text" 
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-2.5 text-sm font-bold text-ig-grey"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-sm font-black text-white/50"
               value={form.location}
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Atas Nama Rekening</label>
+          <div className="space-y-1.5">
+            <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Atas Nama Rekening</label>
             <input 
               required
               type="text" 
-              placeholder="e.g. PT. Logistics Jaya"
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-2.5 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none placeholder:text-gray-400"
+              placeholder="..."
+              className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
+              onKeyDown={handleEnterNextField}
+              onBlur={e => setForm({...form, accountName: toTitleCase(e.target.value)})}
               value={form.accountName}
               onChange={e => setForm({...form, accountName: e.target.value})}
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Nomor Rekening</label>
-            <input 
-              required
-              type="text" 
-              placeholder="000-000-000"
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-2.5 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none placeholder:text-gray-400"
-              value={form.accountNumber}
-              onChange={e => setForm({...form, accountNumber: e.target.value})}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-ig-grey uppercase tracking-wider ml-1">Nama Bank</label>
-            <input 
-              required
-              type="text" 
-              placeholder="e.g. BCA"
-              className="w-full bg-bg-alt border border-border-ig rounded-md px-4 py-2.5 text-sm font-bold focus:ring-1 focus:ring-ig-blue outline-none placeholder:text-gray-400"
-              value={form.bank}
-              onChange={e => setForm({...form, bank: e.target.value})}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">No. Rekening</label>
+              <input 
+                required
+                type="text" 
+                placeholder="000"
+                className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
+                onKeyDown={handleEnterNextField}
+                value={form.accountNumber}
+                onChange={e => setForm({...form, accountNumber: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Bank</label>
+              <input 
+                required
+                type="text" 
+                placeholder="BCA/BRI"
+                className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
+                onKeyDown={handleEnterNextField}
+                onBlur={e => setForm({...form, bank: toTitleCase(e.target.value)})}
+                value={form.bank}
+                onChange={e => setForm({...form, bank: e.target.value})}
+              />
+            </div>
           </div>
 
           <button 
             type="submit"
-            className="w-full mt-4 bg-green-500 text-white py-3 rounded-md font-bold text-[14px] flex items-center justify-center gap-2 hover:bg-green-600 transition-colors"
+            className="w-full mt-6 bg-[#25D366] text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest"
           >
-            <Send size={16} />
-            Kirim ke WhatsApp
+            <Send size={18} fill="currentColor" />
+            Kirim WhatsApp
           </button>
         </form>
       </motion.div>
