@@ -8,37 +8,75 @@ import { StockEntry, MaterialRequest, RequestStatus } from '../../types';
 
 const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
   if (e.key === 'Enter' && e.currentTarget.tagName !== 'TEXTAREA') {
-    const form = (e.currentTarget as HTMLInputElement).form;
+    e.preventDefault();
+    const current = e.currentTarget;
+    let nextElement: HTMLElement | null = null;
+    
+    const form = (current as HTMLInputElement).form;
     if (form) {
-      e.preventDefault();
       const elements = Array.from(form.elements) as HTMLElement[];
-      const index = elements.indexOf(e.currentTarget as any);
+      const index = elements.indexOf(current as any);
       if (index > -1) {
-        let nextIndex = index + 1;
-        while (elements[nextIndex]) {
-          const nextElement = elements[nextIndex];
+        let i = index + 1;
+        while (elements[i]) {
+          const el = elements[i];
           if (
-            (nextElement.tagName === 'INPUT' || nextElement.tagName === 'SELECT') &&
-            !(nextElement as any).disabled &&
-            (nextElement as any).type !== 'hidden' &&
-            (nextElement as any).type !== 'submit'
+            (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'BUTTON') &&
+            !(el as any).disabled && (el as any).type !== 'hidden'
           ) {
-            nextElement.focus();
-            return;
+            nextElement = el;
+            break;
           }
-          if (nextElement.tagName === 'BUTTON' && (nextElement as any).type === 'submit') {
-            nextElement.focus();
-            return;
-          }
-          nextIndex++;
+          i++;
         }
       }
+    } else {
+      // Fallback for non-form containers (like in Report Harian)
+      const container = current.closest('.space-y-1\\.5') || current.closest('.space-y-3') || current.parentElement?.parentElement;
+      if (container) {
+        const focusables = Array.from(container.querySelectorAll('input, select, button')) as HTMLElement[];
+        const index = focusables.indexOf(current);
+        if (index > -1) {
+          let i = index + 1;
+          while (focusables[i]) {
+            const el = focusables[i];
+            const isInput = el.tagName === 'INPUT' || el.tagName === 'SELECT';
+            const isSubmit = el.tagName === 'BUTTON' && (el as any).type === 'submit';
+            if (isInput || isSubmit) {
+              nextElement = el;
+              break;
+            }
+            i++;
+          }
+        }
+      }
+    }
+
+    if (nextElement) {
+      nextElement.focus();
     }
   }
 };
 
 const toTitleCase = (str: string) => {
-  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  if (!str) return '';
+  return str.split(' ').map(word => {
+    if (word.length === 0) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
+const handleTitleCaseChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
+  const { value, selectionStart, selectionEnd } = e.target;
+  const transformed = toTitleCase(value);
+  setter(transformed);
+  
+  // Restore cursor position
+  requestAnimationFrame(() => {
+    if (e.target) {
+      e.target.setSelectionRange(selectionStart, selectionEnd);
+    }
+  });
 };
 
 import RAPDashboard from '../RAP/RAPDashboard';
@@ -1018,6 +1056,7 @@ export default function SMDashboard() {
                         <input 
                           type="number"
                           className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-lg font-black text-white focus:ring-2 focus:ring-white/40 outline-none transition-all"
+                          onKeyDown={handleEnterNextField}
                           onFocus={e => e.target.select()}
                           value={editQuantity}
                           onChange={(e) => setEditQuantity(e.target.value)}
@@ -1299,7 +1338,7 @@ function ReportView({
                     value={row}
                     onKeyDown={handleEnterNextField}
                     onBlur={(e) => updateRow(idx, toTitleCase(e.target.value))}
-                    onChange={(e) => updateRow(idx, e.target.value)}
+                    onChange={(e) => handleTitleCaseChange(e, (val) => updateRow(idx, val))}
                   />
                   <button 
                     onClick={() => handleSendWA('line', idx)}
@@ -1480,7 +1519,7 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
               onKeyDown={handleEnterNextField}
               onBlur={e => setForm({...form, materialName: toTitleCase(e.target.value)})}
               value={form.materialName}
-              onChange={e => setForm({...form, materialName: e.target.value})}
+              onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, materialName: val}))}
             />
           </div>
 
@@ -1509,7 +1548,7 @@ function RequestFormModal({ onClose, subId, onSubmit, initialData, isEdit, statu
                 onKeyDown={handleEnterNextField}
                 onBlur={e => setForm({...form, unit: toTitleCase(e.target.value)})}
                 value={form.unit}
-                onChange={e => setForm({...form, unit: e.target.value})}
+                onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, unit: val}))}
               />
             </div>
           </div>
@@ -1858,7 +1897,7 @@ function ProfileFormModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
                 onKeyDown={handleEnterNextField}
                 onBlur={e => setName(toTitleCase(e.target.value))}
                 value={name}
-                onChange={e => setName(e.target.value)}
+                onChange={e => handleTitleCaseChange(e, (val) => setName(val))}
               />
             </div>
           </div>
@@ -1917,7 +1956,7 @@ function SubFormModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (n
               onKeyDown={handleEnterNextField}
               onBlur={e => setName(toTitleCase(e.target.value))}
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => handleTitleCaseChange(e, (val) => setName(val))}
             />
           </div>
           <div className="flex gap-4">
@@ -2089,14 +2128,15 @@ function FundsView({
     let message = '';
     
     selectedEntries.forEach((nota) => {
-      // Bold header: Dana Lapangan (Nota) (Lokasi)
-      message += `*Dana Lapangan ${nota.notaNo} ${locationName}*\n\n`;
+      // Header: Dana Lapangan - No. (Bold)
+      // Location: (Lokasi)
+      message += `*Dana Lapangan - No. ${nota.notaNo}*\n*${locationName}*\n\n`;
       nota.items.forEach((item: any) => {
-        // Quoted items: (Daftar Item) (Jumlah) (Satuan)
+        // Quoted item list
         message += `> ${item.uraian} ${item.jumlah} ${item.satuan}\n`;
       });
-      // Inline code total
-      message += `\`Total RP ${(nota.totalNota || 0).toLocaleString()}\`\n\n`;
+      // Inline code total with extra space
+      message += `\n\`Total Rp ${(nota.totalNota || 0).toLocaleString()}\`\n\n`;
     });
     
     if (selectedEntries.length > 1) {
@@ -2301,10 +2341,10 @@ function FundsView({
             onSubmit={(entry: any) => {
               addFieldFundEntry(entry);
               
-              // New format: Bold Header (Nota first then Location), Quoted Items, Entire Total line as inline code
-              const msg = `*Dana Lapangan ${entry.notaNo} ${locationName}*\n\n` + 
+              // Format: Dana Lapangan - No. [Nomor] (Bold), Location, Quoted Items, Inline Code Total
+              const msg = `*Dana Lapangan - No. ${entry.notaNo}*\n*${locationName}*\n\n` + 
                           entry.items.map((i: any) => `> ${i.uraian} ${i.jumlah} ${i.satuan}`).join('\n') + 
-                          `\n\`Total RP ${(entry.totalNota || 0).toLocaleString()}\``;
+                          `\n\n\`Total Rp ${(entry.totalNota || 0).toLocaleString()}\``;
               
               window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
               setShowAdd(false);
@@ -2586,7 +2626,7 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-black text-white placeholder:text-white/20 focus:bg-white/10 outline-none transition-all"
                   onKeyDown={handleEnterNextField}
                   value={form.notaNo}
-                  onChange={e => setForm({...form, notaNo: e.target.value})}
+                  onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, notaNo: val}))}
                   placeholder="000"
                 />
               </div>
@@ -2638,7 +2678,7 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
                           onKeyDown={handleEnterNextField}
                           onBlur={e => updateItem(idx, 'uraian', toTitleCase(e.target.value))}
                           value={item.uraian}
-                          onChange={e => updateItem(idx, 'uraian', e.target.value)}
+                          onChange={e => handleTitleCaseChange(e, (val) => updateItem(idx, 'uraian', val))}
                           placeholder="..."
                         />
                       </div>
@@ -2683,7 +2723,7 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
                             onKeyDown={handleEnterNextField}
                             onBlur={e => updateItem(idx, 'satuan', toTitleCase(e.target.value))}
                             value={item.satuan}
-                            onChange={e => updateItem(idx, 'satuan', e.target.value)}
+                            onChange={e => handleTitleCaseChange(e, (val) => updateItem(idx, 'satuan', val))}
                             placeholder="Satuan"
                           />
                         </div>

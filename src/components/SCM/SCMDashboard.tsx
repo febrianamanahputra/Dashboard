@@ -6,37 +6,73 @@ import { RequestStatus, MaterialRequest } from '../../types';
 
 const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
   if (e.key === 'Enter' && e.currentTarget.tagName !== 'TEXTAREA') {
-    const form = (e.currentTarget as HTMLInputElement).form;
+    e.preventDefault();
+    const current = e.currentTarget;
+    let nextElement: HTMLElement | null = null;
+    
+    const form = (current as HTMLInputElement).form;
     if (form) {
-      e.preventDefault();
       const elements = Array.from(form.elements) as HTMLElement[];
-      const index = elements.indexOf(e.currentTarget as any);
+      const index = elements.indexOf(current as any);
       if (index > -1) {
-        let nextIndex = index + 1;
-        while (elements[nextIndex]) {
-          const nextElement = elements[nextIndex];
+        let i = index + 1;
+        while (elements[i]) {
+          const el = elements[i];
           if (
-            (nextElement.tagName === 'INPUT' || nextElement.tagName === 'SELECT') &&
-            !(nextElement as any).disabled &&
-            (nextElement as any).type !== 'hidden' &&
-            (nextElement as any).type !== 'submit'
+            (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'BUTTON') &&
+            !(el as any).disabled && (el as any).type !== 'hidden'
           ) {
-            nextElement.focus();
-            return;
+            nextElement = el;
+            break;
           }
-          if (nextElement.tagName === 'BUTTON' && (nextElement as any).type === 'submit') {
-            nextElement.focus();
-            return;
-          }
-          nextIndex++;
+          i++;
         }
       }
+    } else {
+      const container = current.closest('.space-y-1\\.5') || current.closest('.space-y-3') || current.parentElement?.parentElement;
+      if (container) {
+        const focusables = Array.from(container.querySelectorAll('input, select, button')) as HTMLElement[];
+        const index = focusables.indexOf(current);
+        if (index > -1) {
+          let i = index + 1;
+          while (focusables[i]) {
+            const el = focusables[i];
+            const isInput = el.tagName === 'INPUT' || el.tagName === 'SELECT';
+            const isSubmit = el.tagName === 'BUTTON' && (el as any).type === 'submit';
+            if (isInput || isSubmit) {
+              nextElement = el;
+              break;
+            }
+            i++;
+          }
+        }
+      }
+    }
+
+    if (nextElement) {
+      nextElement.focus();
     }
   }
 };
 
 const toTitleCase = (str: string) => {
-  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  if (!str) return '';
+  return str.split(' ').map(word => {
+    if (word.length === 0) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
+const handleTitleCaseChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
+  const { value, selectionStart, selectionEnd } = e.target;
+  const transformed = toTitleCase(value);
+  setter(transformed);
+  
+  requestAnimationFrame(() => {
+    if (e.target) {
+      e.target.setSelectionRange(selectionStart, selectionEnd);
+    }
+  });
 };
 
 export default function SCMDashboard() {
@@ -483,7 +519,7 @@ function MainMaterialModal({ materials, onAdd, onDelete, onClose }: {
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-black text-white focus:bg-white/10 outline-none"
                   value={name}
                   onBlur={e => setName(toTitleCase(e.target.value))}
-                  onChange={e => setName(e.target.value)}
+                  onChange={e => handleTitleCaseChange(e, (val) => setName(val))}
                   onKeyDown={handleEnterNextField}
                  />
               </div>
@@ -495,7 +531,7 @@ function MainMaterialModal({ materials, onAdd, onDelete, onClose }: {
                   onKeyDown={handleEnterNextField}
                   onBlur={e => setUnit(toTitleCase(e.target.value))}
                   value={unit}
-                  onChange={e => setUnit(e.target.value)}
+                  onChange={e => handleTitleCaseChange(e, (val) => setUnit(val))}
                  />
               </div>
               <button 
@@ -791,7 +827,7 @@ function PaymentModal({ request, locationName, onClose, onConfirm }: {
               onKeyDown={handleEnterNextField}
               onBlur={e => setForm({...form, accountName: toTitleCase(e.target.value)})}
               value={form.accountName}
-              onChange={e => setForm({...form, accountName: e.target.value})}
+              onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, accountName: val}))}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -817,7 +853,7 @@ function PaymentModal({ request, locationName, onClose, onConfirm }: {
                 onKeyDown={handleEnterNextField}
                 onBlur={e => setForm({...form, bank: toTitleCase(e.target.value)})}
                 value={form.bank}
-                onChange={e => setForm({...form, bank: e.target.value})}
+                onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, bank: val}))}
               />
             </div>
           </div>
