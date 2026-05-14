@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { MaterialRequest, Profile, Sub, RequestStatus, Notification, RAPItem, StockEntry, MainMaterial, FieldFundEntry, ReportTemplate } from './types';
+import { MaterialRequest, Profile, Sub, RequestStatus, Notification, RAPItem, StockEntry, MainMaterial, FieldFundEntry, FieldFundDeposit, ReportTemplate } from './types';
 import { GoogleSheetsService, SpreadsheetRow } from './services/GoogleSheetsService';
 import { db, auth } from './lib/firebase';
 import { 
@@ -32,6 +32,7 @@ interface AppContextType {
   rapData: RAPItem[];
   mainMaterials: MainMaterial[];
   fieldFunds: FieldFundEntry[];
+  fieldFundDeposits: FieldFundDeposit[];
   reportTemplates: ReportTemplate[];
   addProfile: (name: string, avatarUrl?: string) => void;
   updateProfile: (id: string, name: string, avatarUrl?: string) => void;
@@ -53,6 +54,9 @@ interface AppContextType {
   updateStock: (subId: string, stockId: string, newQuantity: number) => void;
   addFieldFundEntry: (entry: Omit<FieldFundEntry, 'id' | 'createdAt'>) => void;
   deleteFieldFundEntry: (id: string) => void;
+  addFieldFundDeposit: (deposit: Omit<FieldFundDeposit, 'id' | 'createdAt'>) => void;
+  updateFieldFundDeposit: (id: string, amount: number, type: 'in' | 'out') => void;
+  deleteFieldFundDeposit: (id: string) => void;
   updateReportTemplate: (subId: string, heading: string, footer: string) => void;
   accessToken: string | null;
   setAccessToken: (token: string | null) => void;
@@ -69,6 +73,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [rapData, setRapItems] = useState<RAPItem[]>([]);
   const [mainMaterials, setMainMaterials] = useState<MainMaterial[]>([]);
   const [fieldFunds, setFieldFunds] = useState<FieldFundEntry[]>([]);
+  const [fieldFundDeposits, setFieldFundDeposits] = useState<FieldFundDeposit[]>([]);
   const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([]);
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
@@ -86,6 +91,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items.sort((a, b) => b.createdAt - a.createdAt);
       setFieldFunds(items);
     }, (error) => handleFirestoreError(error, OperationType.GET, 'fieldFunds'));
+    
+    // 6b. Field Fund Deposits
+    const unsubscribeDeposits = onSnapshot(collection(db, 'fieldFundDeposits'), (snapshot) => {
+      const items: FieldFundDeposit[] = [];
+      snapshot.forEach(doc => {
+        items.push({ id: doc.id, ...doc.data() } as FieldFundDeposit);
+      });
+      items.sort((a, b) => b.createdAt - a.createdAt);
+      setFieldFundDeposits(items);
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'fieldFundDeposits'));
 
     // 7. Report Templates
     const unsubscribeTemplates = onSnapshot(collection(db, 'reportTemplates'), (snapshot) => {
@@ -168,6 +183,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubscribeNotifications();
       unsubscribeMainMaterials();
       unsubscribeFieldFunds();
+      unsubscribeDeposits();
       unsubscribeTemplates();
     };
   }, []);
@@ -569,6 +585,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const addFieldFundDeposit = async (deposit: Omit<FieldFundDeposit, 'id' | 'createdAt'>) => {
+    try {
+      await addDoc(collection(db, 'fieldFundDeposits'), {
+        ...deposit,
+        createdAt: Date.now()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'fieldFundDeposits');
+    }
+  };
+
+  const updateFieldFundDeposit = async (id: string, amount: number, type: 'in' | 'out') => {
+    try {
+      await updateDoc(doc(db, 'fieldFundDeposits', id), { amount, type });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `fieldFundDeposits/${id}`);
+    }
+  };
+
+  const deleteFieldFundDeposit = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'fieldFundDeposits', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `fieldFundDeposits/${id}`);
+    }
+  };
+
   const updateReportTemplate = async (subId: string, heading: string, footer: string) => {
     try {
       const existing = reportTemplates.find(t => t.subId === subId);
@@ -628,8 +671,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateStock,
       addFieldFundEntry,
       deleteFieldFundEntry,
+      addFieldFundDeposit,
+      updateFieldFundDeposit,
+      deleteFieldFundDeposit,
       updateReportTemplate,
       fieldFunds,
+      fieldFundDeposits,
       reportTemplates,
       mainMaterials,
       accessToken,

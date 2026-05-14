@@ -95,6 +95,15 @@ export interface FieldFundItem {
   hargaTotal: number;
 }
 
+export interface FieldFundDeposit {
+  id: string;
+  subId: string;
+  amount: number;
+  type: 'in' | 'out';
+  date: string;
+  createdAt: number;
+}
+
 export interface FieldFundEntry {
   id: string;
   subId: string;

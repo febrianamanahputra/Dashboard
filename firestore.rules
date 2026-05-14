@@ -92,9 +92,25 @@ service cloud.firestore {
              data.footer is string;
     }
 
+    function isValidFieldFundDeposit(data) {
+      return data.keys().hasAll(['subId', 'amount', 'type', 'date', 'createdAt']) &&
+             data.subId is string && isValidId(data.subId) &&
+             data.amount is number &&
+             data.type is string && (data.type == 'in' || data.type == 'out') &&
+             data.date is string &&
+             data.createdAt is number;
+    }
+
     // 3. COLLECTIONS
     match /mainMaterials/{id} {
       allow read, write: if true;
+    }
+
+    match /fieldFundDeposits/{depositId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidFieldFundDeposit(incoming()) && isValidId(depositId);
+      allow update: if isSignedIn() && isValidFieldFundDeposit(incoming());
+      allow delete: if isSignedIn();
     }
 
     match /fieldFunds/{fundId} {

@@ -142,6 +142,19 @@
         "footer": { "type": "string" }
       },
       "required": ["subId", "heading", "footer"]
+    },
+    "FieldFundDeposit": {
+      "title": "Field Fund Deposit",
+      "description": "Adjustments (Add/Subtract) to the field fund balance.",
+      "type": "object",
+      "properties": {
+        "subId": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["in", "out"] },
+        "date": { "type": "string", "format": "date" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["subId", "amount", "type", "date", "createdAt"]
     }
   },
   "firestore": {
@@ -152,6 +165,10 @@
     "fieldFunds": {
       "schema": "FieldFundEntry",
       "description": "Collection of field fund financial records."
+    },
+    "fieldFundDeposits": {
+      "schema": "FieldFundDeposit",
+      "description": "Collection of field fund deposits and withdrawals."
     },
     "reportTemplates": {
       "schema": "ReportTemplate",

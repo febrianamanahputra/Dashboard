@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../AppContext';
 import { db } from '../../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle, Truck, Check, Banknote, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle, Truck, Check, Banknote, MessageCircle, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { StockEntry, MaterialRequest, RequestStatus } from '../../types';
 
 const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
@@ -2090,10 +2090,29 @@ function FundsView({
   viewingNota: any;
   setViewingNota: (v: any) => void;
 }) {
-  const { fieldFunds = [], addFieldFundEntry, deleteFieldFundEntry, profiles = [], subs = [], activeProfileId } = useApp();
+  const { 
+    fieldFunds = [], 
+    fieldFundDeposits = [],
+    addFieldFundEntry, 
+    deleteFieldFundEntry, 
+    addFieldFundDeposit,
+    updateFieldFundDeposit,
+    deleteFieldFundDeposit,
+    profiles = [], 
+    subs = [], 
+    activeProfileId 
+  } = useApp();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showWallet, setShowWallet] = useState(false);
   
   const subFunds = fieldFunds.filter(f => f.subId === subId).sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+  
+  const subDeposits = fieldFundDeposits.filter(d => d.subId === subId);
+  
+  const totalExpenses = subFunds.reduce((acc, f) => acc + (f.totalNota || 0), 0);
+  const totalDeposits = subDeposits.reduce((acc, d) => acc + (d.type === 'out' ? -d.amount : d.amount), 0);
+  const currentBalance = totalDeposits - totalExpenses;
+
   const lastNotaNo = subFunds.length > 0 ? subFunds[0].notaNo : '';
 
   const activeProfile = profiles.find(p => p.id === activeProfileId);
@@ -2178,15 +2197,18 @@ function FundsView({
       <div 
         className="px-4 py-4 border-b border-white/10 flex items-center justify-between sticky top-0 z-10 text-left overflow-hidden bg-black/20 backdrop-blur-md"
       >
-        <div className="flex items-center gap-3 relative z-10">
+        <button 
+          onClick={() => setShowWallet(true)}
+          className="flex items-center gap-3 relative z-10 hover:bg-white/5 p-1 rounded-2xl transition-all active:scale-95"
+        >
           <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white">
-            <Landmark size={22} />
+            <Wallet size={22} />
           </div>
           <div>
             <h2 className="text-sm font-black tracking-tight text-white uppercase">Dana Lapangan</h2>
-            <p className="text-[9px] text-white/60 font-black uppercase tracking-widest leading-none">Petty Cash Proyek</p>
+            <p className="text-[10px] text-lime-400 font-black uppercase tracking-widest leading-none mt-0.5">Rp {currentBalance.toLocaleString()}</p>
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
             <>
@@ -2288,7 +2310,7 @@ function FundsView({
         className="bg-black/95 backdrop-blur-xl w-full max-w-sm rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col border border-white/20"
       >
         <div className="bg-white/5 p-8 pb-12 relative overflow-hidden border-b border-white/10">
-          <Landmark size={120} className="absolute -right-10 -bottom-10 text-white/10 -rotate-12 pointer-events-none" />
+          <Wallet size={120} className="absolute -right-10 -bottom-10 text-white/10 -rotate-12 pointer-events-none" />
           <div className="relative z-10 flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-black text-white leading-none tracking-tight">Detail Nota</h3>
@@ -2356,6 +2378,27 @@ function FundsView({
       </AnimatePresence>
 
       <AnimatePresence>
+        {showWallet && (
+          <WalletModal 
+            subId={subId}
+            deposits={subDeposits}
+            balance={currentBalance}
+            onClose={() => setShowWallet(false)}
+            onAdd={(amount: number, type: 'in' | 'out') => {
+              addFieldFundDeposit({
+                subId,
+                amount,
+                type,
+                date: new Date().toLocaleDateString('id-ID'),
+              });
+            }}
+            onUpdate={(id: string, amount: number, type: 'in' | 'out') => updateFieldFundDeposit(id, amount, type)}
+            onDelete={(id: string) => deleteFieldFundDeposit(id)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showAdd && (
           <FundEntryModal 
             subId={subId}
@@ -2375,6 +2418,151 @@ function FundsView({
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function WalletModal({ subId, deposits, balance, onClose, onAdd, onUpdate, onDelete }: any) {
+  const [amount, setAmount] = useState('');
+  const [type, setType] = useState<'in' | 'out'>('in');
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount) return;
+    if (editingId) {
+      onUpdate(editingId, parseFloat(amount), type);
+      setEditingId(null);
+    } else {
+      onAdd(parseFloat(amount), type);
+    }
+    setAmount('');
+    setType('in');
+  };
+
+  return (
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[400] flex items-center justify-center p-4 text-left">
+      <motion.div 
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 50, opacity: 0 }}
+        className="bg-zinc-900 border border-white/10 w-full max-w-sm rounded-[32px] p-8 shadow-2xl flex flex-col max-h-[80vh]"
+      >
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 rounded-2xl bg-lime-500/10 flex items-center justify-center text-lime-400 border border-lime-500/20">
+                <Wallet size={20} />
+             </div>
+             <div>
+                <h3 className="text-base font-black text-white">Saldo Dana</h3>
+                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Management</p>
+             </div>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="mb-8 p-6 bg-white/5 rounded-2xl border border-white/10 text-center">
+           <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Total Saldo Saat Ini</p>
+           <h4 className={`text-2xl font-black ${balance >= 0 ? 'text-lime-400' : 'text-red-400'}`}>
+            Rp {balance.toLocaleString()}
+           </h4>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mb-8 space-y-4">
+           <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10">
+              <button 
+                type="button"
+                onClick={() => setType('in')}
+                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${type === 'in' ? 'bg-lime-500 text-black' : 'text-white/40'}`}
+              >
+                Pemasukan
+              </button>
+              <button 
+                type="button"
+                onClick={() => setType('out')}
+                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${type === 'out' ? 'bg-red-500 text-white' : 'text-white/40'}`}
+              >
+                Pengurangan
+              </button>
+           </div>
+
+           <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">
+                {editingId ? 'Edit Nominal' : 'Input Saldo Baru'}
+              </label>
+              <div className="flex gap-2">
+                 <input 
+                    type="number"
+                    placeholder="Contoh: 1000000"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white outline-none focus:bg-white/10 transition-all placeholder:text-white/10"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    autoFocus
+                 />
+                 <button 
+                    type="submit"
+                    className={`px-6 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all ${type === 'in' ? 'bg-lime-500 text-black' : 'bg-red-500 text-white'}`}
+                 >
+                    {editingId ? 'Ok' : 'Add'}
+                 </button>
+              </div>
+              {editingId && (
+                <button 
+                  type="button"
+                  onClick={() => { setEditingId(null); setAmount(''); setType('in'); }}
+                  className="text-[9px] font-black text-red-400 uppercase tracking-widest ml-1"
+                >
+                  Batal Edit
+                </button>
+              )}
+           </div>
+        </form>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+          <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-2">Riwayat Pengisian</p>
+          {deposits.length === 0 ? (
+            <div className="py-8 text-center bg-white/[0.02] rounded-2xl border border-dashed border-white/10">
+               <p className="text-xs font-bold text-white/20 italic">Belum ada pengisian saldo</p>
+            </div>
+          ) : (
+            deposits.map((d: any) => (
+              <div key={d.id} className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl flex items-center justify-between group">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${d.type === 'out' ? 'bg-red-500/10 text-red-500' : 'bg-lime-500/10 text-lime-500'}`}>
+                    {d.type === 'out' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                  </div>
+                  <div>
+                    <p className={`text-xs font-black ${d.type === 'out' ? 'text-red-400' : 'text-lime-400'}`}>
+                      {d.type === 'out' ? '-' : '+'} Rp {d.amount.toLocaleString()}
+                    </p>
+                    <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{d.date}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <button 
+                    onClick={() => { 
+                      setEditingId(d.id); 
+                      setAmount(d.amount.toString()); 
+                      setType(d.type || 'in');
+                    }}
+                    className="p-2 text-white/40 hover:text-white transition-colors"
+                   >
+                     <Edit2 size={14} />
+                   </button>
+                   <button 
+                    onClick={() => onDelete(d.id)}
+                    className="p-2 text-white/40 hover:text-red-500 transition-colors"
+                   >
+                     <Trash2 size={14} />
+                   </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }
