@@ -97,21 +97,28 @@ export default function Layout() {
     }
 
     const handlePopState = (e: PopStateEvent) => {
-      // If the state says it's a sub-navigation (internal dashboard view/modal)
+      // Priority 1: If notebook or notifications are open, close them first
+      if (showNotebook) {
+        setShowNotebook(false);
+        // Push state back so we stay in the same view context
+        window.history.pushState({ role, isSubNav: true }, '');
+        return;
+      }
+
+      if (showNotifications) {
+        setShowNotifications(false);
+        // Push state back so we stay in the same view context
+        window.history.pushState({ role, isSubNav: true }, '');
+        return;
+      }
+
+      // Priority 2: If the state says it's a sub-navigation (internal dashboard view/modal)
       // we let the dashboards handle it via their own listeners.
       if (e.state?.isSubNav) {
         return;
       }
 
       const targetRole = e.state?.role ?? null;
-
-      // If notifications are open, close them first
-      if (showNotifications) {
-        setShowNotifications(false);
-        // Put history back so we don't exit/switch role unexpectedly
-        window.history.pushState({ role, notifications: true, isSubNav: true }, '');
-        return;
-      }
 
       if (role !== null && targetRole === null) {
         // Going back from dashboard to selection
@@ -258,8 +265,8 @@ export default function Layout() {
               <header className="lg:hidden h-[60px] border-b border-white/5 flex items-center justify-between px-4 shrink-0 sticky top-0 bg-black/40 backdrop-blur-md z-30">
                 <div className="flex items-center gap-3">
                   <button 
-                    onClick={() => { setRole(null); setShowNotifications(false); }}
-                    className="p-1 hover:bg-white/5 rounded-full transition-colors text-white"
+                    onClick={() => window.history.back()}
+                    className="p-1 rounded-full transition-colors text-white active:opacity-60"
                   >
                     <ArrowLeft size={24} />
                   </button>
@@ -270,14 +277,22 @@ export default function Layout() {
                 
                 <div className="flex items-center gap-4">
                   <button 
-                    onClick={() => setShowNotebook(true)}
-                    className="p-1 hover:opacity-70 transition-opacity text-white"
+                    onClick={() => {
+                      setShowNotebook(true);
+                      window.history.pushState({ role, isSubNav: true }, '');
+                    }}
+                    className="p-1 transition-opacity text-white opacity-100 active:opacity-60"
                   >
                     <Heart size={24} strokeWidth={2} />
                   </button>
                   <button 
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative p-1 hover:opacity-70 transition-opacity text-white"
+                    onClick={() => {
+                      if (!showNotifications) {
+                        window.history.pushState({ role, isSubNav: true }, '');
+                      }
+                      setShowNotifications(!showNotifications);
+                    }}
+                    className="relative p-1 transition-opacity text-white opacity-100 active:opacity-60"
                   >
                     <Bell size={24} strokeWidth={2} />
                     {unreadCount > 0 && (

@@ -2471,7 +2471,7 @@ function ProfileSelectionModal({ profiles, onSelect, onAdd, getProfileAvatar, on
       >
         <div className="px-8 py-8 border-b border-white/10 bg-white/5 text-center">
           <h2 className="text-2xl font-black tracking-tight mb-1 text-white leading-none">Renovki Konstruksi</h2>
-          <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">Pilih Lokasi Proyek</p>
+          <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">Pilih Profile</p>
         </div>
         
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
@@ -2530,9 +2530,6 @@ function ProfileSelectionModal({ profiles, onSelect, onAdd, getProfileAvatar, on
           )}
         </div>
         
-        <div className="p-6 bg-white/5 border-t border-white/10 text-center backdrop-blur-md">
-            <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em]">Selamat Bekerja, Site Manager!</p>
-        </div>
       </motion.div>
     </div>
   );
