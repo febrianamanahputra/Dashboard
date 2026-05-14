@@ -94,6 +94,31 @@ export default function SCMDashboard() {
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [viewingHistorySubId, setViewingHistorySubId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const hasOpenModal = !!(showPaymentModal || showMainMaterialModal);
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && !e.state.isSubNav && e.state.role === null) return;
+
+      if (showPaymentModal) {
+        setShowPaymentModal(null);
+      } else if (showMainMaterialModal) {
+        setShowMainMaterialModal(false);
+      } else if (viewingHistorySubId) {
+        setViewingHistorySubId(null);
+      } else if (activeTab !== 'active') {
+        setActiveTab('active');
+      }
+    };
+
+    if (hasOpenModal || activeTab !== 'active' || viewingHistorySubId) {
+      window.history.pushState({ role: 'SCM', isSubNav: true }, '');
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showPaymentModal, showMainMaterialModal, activeTab, viewingHistorySubId]);
+
   const getStatusLabel = (s: string) => {
     switch (s) {
       case 'pending': return 'Belum Di Proses';

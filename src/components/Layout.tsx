@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../AppContext';
-import { Bell, X, HardHat, Truck, Wallet, Globe, LogOut, User, ArrowLeft } from 'lucide-react';
+import { Bell, Heart, X, HardHat, Truck, Wallet, Globe, LogOut, User, ArrowLeft, Send, Trash2 } from 'lucide-react';
 import SMDashboard from './SM/SMDashboard';
 import SCMDashboard from './SCM/SCMDashboard';
 import FinanceDashboard from './Finance/FinanceDashboard';
@@ -26,6 +26,31 @@ export default function Layout() {
   const [role, setRole] = useState<Role>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const { notifications, dismissNotification, markNotificationsAsRead, setAccessToken } = useApp();
+  const [showNotebook, setShowNotebook] = useState(false);
+  const [notes, setNotes] = useState<{ id: string; text: string; date: string }[]>(() => {
+    const saved = localStorage.getItem('renovki_notes_v2');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentNote, setCurrentNote] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('renovki_notes_v2', JSON.stringify(notes));
+  }, [notes]);
+
+  const saveNote = () => {
+    if (!currentNote.trim()) return;
+    const newNote = {
+      id: Date.now().toString(),
+      text: currentNote,
+      date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    };
+    setNotes([newNote, ...notes]);
+    setCurrentNote('');
+  };
+
+  const deleteNote = (id: string) => {
+    setNotes(notes.filter(n => n.id !== id));
+  };
 
   const handleGoogleLogin = async () => {
     if (!google?.accounts?.oauth2) return;
@@ -64,6 +89,59 @@ export default function Layout() {
       markNotificationsAsRead(role);
     }
   }, [showNotifications, role, notifications.length]);
+
+  useEffect(() => {
+    // Initialize history state on mount
+    if (!window.history.state) {
+      window.history.replaceState({ entry: true, role: null }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      // If the state says it's a sub-navigation (internal dashboard view/modal)
+      // we let the dashboards handle it via their own listeners.
+      if (e.state?.isSubNav) {
+        return;
+      }
+
+      const targetRole = e.state?.role ?? null;
+
+      // If notifications are open, close them first
+      if (showNotifications) {
+        setShowNotifications(false);
+        // Put history back so we don't exit/switch role unexpectedly
+        window.history.pushState({ role, notifications: true, isSubNav: true }, '');
+        return;
+      }
+
+      if (role !== null && targetRole === null) {
+        // Going back from dashboard to selection
+        setRole(null);
+      } else if (role === null && targetRole === null) {
+        // Already at selection screen, check for exit
+        if (window.confirm('Keluar dari aplikasi?')) {
+          // If they confirm, we let it go
+        } else {
+          // If they cancel, push state again to "trap" the back button
+          window.history.pushState({ entry: true, role: null }, '');
+        }
+      } else if (targetRole !== role) {
+        // Handle direct role switching if needed
+        setRole(targetRole);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [role, showNotifications]);
+
+  // Push state when role changes to enable back button
+  useEffect(() => {
+    if (role !== null) {
+      // Only push if transition is from null to something
+      // or if we want to ensure it's in history
+      window.history.pushState({ role, isSubNav: false }, '');
+    }
+  }, [role]);
 
   return (
     <div className="min-h-screen bg-black font-sans text-white flex flex-col lg:flex-row h-[100dvh] overflow-hidden">
@@ -140,15 +218,21 @@ export default function Layout() {
                 <SidebarLink 
                   icon={<Globe size={24} />} 
                   label="Dashboard" 
-                  active={!showNotifications}
-                  onClick={() => setShowNotifications(false)}
+                  active={!showNotifications && !showNotebook}
+                  onClick={() => { setShowNotifications(false); setShowNotebook(false); }}
+                />
+                <SidebarLink 
+                  icon={<Heart size={24} />} 
+                  label="Notebook" 
+                  active={showNotebook}
+                  onClick={() => setShowNotebook(true)}
                 />
                 <SidebarLink 
                   icon={<Bell size={24} />} 
                   label="Activity" 
                   badge={unreadCount > 0}
                   active={showNotifications}
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={() => { setShowNotifications(!showNotifications); setShowNotebook(false); }}
                 />
               </div>
 
@@ -186,16 +270,19 @@ export default function Layout() {
                 
                 <div className="flex items-center gap-4">
                   <button 
+                    onClick={() => setShowNotebook(true)}
+                    className="p-1 hover:opacity-70 transition-opacity text-white"
+                  >
+                    <Heart size={24} strokeWidth={2} />
+                  </button>
+                  <button 
                     onClick={() => setShowNotifications(!showNotifications)}
                     className="relative p-1 hover:opacity-70 transition-opacity text-white"
                   >
-                    <Bell size={24} />
+                    <Bell size={24} strokeWidth={2} />
                     {unreadCount > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 w-[10px] h-[10px] bg-red-500 rounded-full border-2 border-black" />
                     )}
-                  </button>
-                  <button onClick={handleLogout} className="p-1 hover:opacity-70 transition-opacity text-white">
-                    <LogOut size={24} />
                   </button>
                 </div>
               </header>
@@ -212,6 +299,133 @@ export default function Layout() {
                   </motion.div>
                 </div>
               </main>
+
+              {/* Notebook Modal */}
+              <AnimatePresence>
+                {showNotebook && (
+                  <>
+                    <motion.div 
+                      key="notebook-overlay"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setShowNotebook(false)}
+                      className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100]"
+                    />
+                    <motion.div 
+                      key="notebook-modal"
+                      initial={{ y: '100%' }}
+                      animate={{ y: 0 }}
+                      exit={{ y: '100%' }}
+                      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                      className="fixed bottom-0 left-0 right-0 h-[85dvh] bg-zinc-950/90 backdrop-blur-3xl rounded-t-[40px] z-[110] flex flex-col shadow-[0_-20px_50px_rgba(0,0,0,0.5)] overflow-hidden border-t border-white/10"
+                    >
+                      {/* Header with Close Handle */}
+                      <div className="w-full flex justify-center pt-4 pb-2 shrink-0">
+                         <div className="w-12 h-1.5 bg-white/10 rounded-full" />
+                      </div>
+
+                      <div className="p-6 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+                        <div className="flex items-center justify-between mb-6">
+                           <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10">
+                                 <Heart size={20} fill="currentColor" className="text-pink-500" />
+                              </div>
+                              <div>
+                                 <h3 className="text-xl font-bold text-white tracking-tight italic">Buku Catatan</h3>
+                                 <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Personal Notes</p>
+                              </div>
+                           </div>
+                           <button 
+                              onClick={() => setShowNotebook(false)}
+                              className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                           >
+                              <X size={24} />
+                           </button>
+                        </div>
+
+                        {/* Input Area */}
+                        <div className="space-y-4 mb-8 shrink-0">
+                           <div className="relative group">
+                              <textarea 
+                                 className="w-full h-32 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none text-white font-medium placeholder:text-white/20 transition-all focus:bg-white/10 focus:border-lime-500/30"
+                                 placeholder="Tulis catatan di sini..."
+                                 value={currentNote}
+                                 onChange={(e) => setCurrentNote(e.target.value)}
+                              />
+                              <div className="absolute top-4 right-4 text-white/10">
+                                 <Send size={16} />
+                              </div>
+                           </div>
+                           <button 
+                              onClick={saveNote}
+                              disabled={!currentNote.trim()}
+                              className="w-full py-4 bg-lime-500/20 hover:bg-lime-500/30 disabled:opacity-30 text-lime-400 border border-lime-500/20 font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg tracking-[0.2em] text-xs uppercase"
+                           >
+                              Simpan Catatan
+                           </button>
+                        </div>
+
+                        {/* List Area */}
+                        <div className="flex-1 flex flex-col group/list">
+                           <div className="flex items-center gap-2 mb-4 shrink-0">
+                              <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Catatan Tersimpan</p>
+                              <div className="h-px flex-1 bg-white/5" />
+                           </div>
+
+                           <div className="space-y-3 pb-8">
+                             {notes.length === 0 ? (
+                               <div className="py-12 flex flex-col items-center justify-center text-white/10 italic">
+                                 <Heart size={32} strokeWidth={1} className="mb-2 opacity-20" />
+                                 <p className="text-xs">Belum ada catatan</p>
+                               </div>
+                             ) : (
+                               notes.map((note) => (
+                                 <div 
+                                   key={note.id} 
+                                   className="flex items-center gap-4 p-4 bg-white/[0.03] border border-white/5 rounded-2xl group hover:border-lime-500/20 transition-all"
+                                 >
+                                   {/* Drag Handle Mockup */}
+                                   <div className="grid grid-cols-2 gap-0.5 shrink-0">
+                                      {[...Array(6)].map((_, i) => (
+                                        <div key={i} className="w-1 h-1 bg-white/10 rounded-full" />
+                                      ))}
+                                   </div>
+
+                                   <div className="flex-1 min-w-0">
+                                      <div className="flex flex-col gap-1">
+                                         <p className="text-sm font-medium text-white/90 leading-relaxed">{note.text}</p>
+                                         <div className="flex items-center gap-2">
+                                            <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">{note.date}</span>
+                                         </div>
+                                      </div>
+                                   </div>
+
+                                   <button 
+                                      onClick={() => deleteNote(note.id)}
+                                      className="text-white/10 hover:text-red-500 p-2 transition-colors hover:bg-red-500/10 rounded-xl"
+                                   >
+                                      <X size={16} />
+                                   </button>
+                                 </div>
+                               ))
+                             )}
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="p-6 shrink-0 bg-white/[0.02] border-t border-white/5">
+                        <button 
+                          onClick={() => setShowNotebook(false)}
+                          className="w-full bg-white/10 text-white/60 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] active:scale-[0.98] transition-all border border-white/5 hover:bg-white/20 hover:text-white"
+                        >
+                          Tutup
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
 
               {/* Mobile Bottom Navigation (Instagram Style) - Only for SCM as others have their own */}
               {(role === 'SCM') && (

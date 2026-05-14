@@ -9,6 +9,25 @@ export default function FinanceDashboard() {
   const [activeTab, setActiveTab] = useState<'requests' | 'funds'>('requests');
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && !e.state.isSubNav && e.state.role === null) return;
+      
+      if (selectedSubId) {
+        setSelectedSubId(null);
+      } else if (activeTab !== 'requests') {
+        setActiveTab('requests');
+      }
+    };
+
+    if (selectedSubId || activeTab !== 'requests') {
+      window.history.pushState({ role: 'FINANCE', isSubNav: true }, '');
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedSubId, activeTab]);
+
   // Finance only cares about requests that are 'awaiting_payment' or 'paid'
   const relevantRequests = requests.filter(r => r.status === 'awaiting_payment' || r.status === 'paid');
 

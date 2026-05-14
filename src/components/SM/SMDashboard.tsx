@@ -155,21 +155,17 @@ export default function SMDashboard() {
   // Back Button Navigation Support for Android/Mobile Browser
   React.useEffect(() => {
     const hasOpenModal = !!(
-      showAddForm || 
-      editingRequest || 
-      showMainRequestForm || 
-      selectedStock || 
-      selectedRequestForDetail || 
-      receivingRequest || 
-      showAdd || 
-      viewingNota ||
-      showAddProfile ||
-      showAddSub ||
-      showEditProfile ||
-      showEditSub
+      showAddForm || editingRequest || showMainRequestForm || selectedStock || 
+      selectedRequestForDetail || receivingRequest || showAdd || viewingNota ||
+      showAddProfile || showAddSub || showEditProfile || showEditSub
     );
 
     const handlePopState = (e: PopStateEvent) => {
+      // If this back event is handled by some other logic or is meant for role change, skip
+      if (e.state && !e.state.isSubNav && e.state.role === null) {
+        return; 
+      }
+
       if (hasOpenModal) {
         // Close all modals instead of navigating away
         setShowAddForm(false);
@@ -184,16 +180,20 @@ export default function SMDashboard() {
         setShowAddSub(false);
         setShowEditProfile(false);
         setShowEditSub(null);
-        
-        // Push state again to prevent further back navigation if user presses back again
-        // unless they want to go back from the current "view"
+      } else if (view === 'rap') {
+        setView('main');
+      } else if (activeSubId) {
+        setActiveSubId(null);
+      } else if (activeProfileId) {
+        setActiveProfileId(null);
       } else if (activeView !== 'requests') {
         setActiveView('requests');
       }
     };
 
-    if (hasOpenModal || activeView !== 'requests') {
-      window.history.pushState({ view: activeView, modal: hasOpenModal }, "");
+    // Push history state whenever we navigate deeper or open a modal
+    if (hasOpenModal || activeView !== 'requests' || activeProfileId || activeSubId || view === 'rap') {
+      window.history.pushState({ role: 'SM', isSubNav: true }, "");
     }
 
     window.addEventListener('popstate', handlePopState);
@@ -201,7 +201,8 @@ export default function SMDashboard() {
   }, [
     showAddForm, editingRequest, showMainRequestForm, selectedStock, 
     selectedRequestForDetail, receivingRequest, showAdd, viewingNota,
-    showAddProfile, showAddSub, showEditProfile, showEditSub, activeView
+    showAddProfile, showAddSub, showEditProfile, showEditSub, 
+    activeView, activeProfileId, activeSubId, view
   ]);
 
   const activeProfile = profiles.find(p => p.id === activeProfileId);
@@ -1336,14 +1337,31 @@ function ReportView({
                     className="flex-1 px-4 py-3 text-xs font-bold outline-none bg-transparent text-white placeholder:text-white/60 placeholder:italic z-10"
                     placeholder="Input detail pekerjaan..."
                     value={row}
-                    onKeyDown={handleEnterNextField}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const inputs = document.querySelectorAll('input[placeholder="Input detail pekerjaan..."]');
+                        if (idx === rows.length - 1) {
+                          if (row.trim() !== '') {
+                            addRow();
+                            setTimeout(() => {
+                              const newInputs = document.querySelectorAll('input[placeholder="Input detail pekerjaan..."]');
+                              (newInputs[newInputs.length - 1] as HTMLInputElement)?.focus();
+                            }, 50);
+                          }
+                        } else {
+                          // Focus next input specifically, skipping the "send" button
+                          (inputs[idx + 1] as HTMLInputElement)?.focus();
+                        }
+                      }
+                    }}
                     onBlur={(e) => updateRow(idx, toTitleCase(e.target.value))}
                     onChange={(e) => handleTitleCaseChange(e, (val) => updateRow(idx, val))}
                   />
                   <button 
                     onClick={() => handleSendWA('line', idx)}
                     disabled={!row.trim()}
-                    className={`p-2 transition-colors relative z-10 ${row.trim() ? 'text-white hover:bg-white/10' : 'text-white/30'}`}
+                    className={`p-2 transition-colors relative z-10 ${row.trim() ? 'text-emerald-400 hover:bg-white/10' : 'text-white/30'}`}
                     title="Kirim Baris Ini"
                   >
                     <Send size={14} />
@@ -1363,7 +1381,7 @@ function ReportView({
           <div className="pt-6">
             <button 
               onClick={() => handleSendWA('full')}
-              className="w-full bg-[#25D366] text-white py-5 rounded-none flex items-center justify-center gap-3 transition-all hover:brightness-110 active:scale-[0.98] shadow-2xl font-black uppercase tracking-[0.2em]"
+              className="w-full bg-emerald-500/20 backdrop-blur-xl border border-emerald-500/30 text-emerald-400 py-5 rounded-2xl flex items-center justify-center gap-3 transition-all hover:bg-emerald-500/30 active:scale-[0.98] shadow-[0_10px_30px_rgba(16,185,129,0.1)] font-black uppercase tracking-[0.2em]"
             >
               <Send size={20} fill="currentColor" />
               <span className="text-xs font-black">Kirim Report WhatsApp</span>
@@ -2594,9 +2612,10 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
       <motion.div 
         initial={{ scale: 0.95, opacity: 0, y: -50 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="bg-black/95 backdrop-blur-2xl w-full max-w-sm rounded-[32px] shadow-2xl relative border border-white/10 my-4 flex flex-col"
+        className="bg-zinc-900/70 backdrop-blur-3xl w-full max-w-sm rounded-[40px] shadow-2xl relative border border-white/20 my-4 flex flex-col overflow-hidden max-h-[90dvh]"
+        onClick={e => e.stopPropagation()}
       >
-        <div className="px-5 pt-5 pb-1 relative z-10 flex items-center justify-between">
+        <div className="px-5 pt-5 pb-4 relative z-10 flex items-center justify-between border-b border-white/10 bg-white/[0.03] shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white">
               <Banknote size={16} />
@@ -2607,6 +2626,7 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
             </div>
           </div>
           <button 
+            type="button"
             onClick={onClose} 
             className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all"
           >
@@ -2621,7 +2641,7 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
           onSubmit({ ...form, items: validItems });
         }} className="flex-1 flex flex-col min-h-0 relative z-10">
           
-          <div className="px-5 pb-4 space-y-3 overflow-y-auto custom-scrollbar pt-4">
+          <div className="px-5 py-4 border-b border-white/10 bg-white/[0.02] shrink-0">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-white/40 uppercase tracking-widest ml-1">No. Nota</label>
@@ -2647,133 +2667,149 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
                 />
               </div>
             </div>
+          </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between px-1">
-                <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Item Nota</p>
-                <button 
-                  type="button"
-                  onClick={addItem}
-                  className="text-[8px] font-black text-white uppercase tracking-widest bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/20 transition-all active:scale-95"
-                >
-                  + Tambah
-                </button>
-              </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar pb-[140px] space-y-4">
+            <div className="flex items-center justify-between px-1 bg-transparent sticky top-0 py-2 z-20 backdrop-blur-md">
+              <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Item Nota</p>
+              <button 
+                type="button"
+                onClick={addItem}
+                className="text-[8px] font-black text-white uppercase tracking-widest bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/20 transition-all active:scale-95"
+              >
+                + Tambah
+              </button>
+            </div>
 
-              <div className="space-y-3 pb-32">
-                {form.items.map((item, idx) => (
-                  <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-2xl relative shadow-sm">
-                    {form.items.length > 1 && (
-                      <button 
-                        type="button"
-                        onClick={() => removeItem(idx)}
-                        className="absolute -top-1 -right-1 w-7 h-7 bg-red-500 text-white rounded-xl flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+            <div className="space-y-4">
+              {form.items.map((item, idx) => (
+                <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-2xl relative shadow-sm">
+                  {form.items.length > 1 && (
+                    <button 
+                      type="button"
+                      onClick={() => removeItem(idx)}
+                      className="absolute -top-1 -right-1 w-7 h-7 bg-red-500/80 backdrop-blur-md text-white rounded-xl flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
 
-                    <div className="space-y-3">
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Uraian Pekerjaan / Material</label>
+                      <input 
+                        type="text" 
+                        required
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
+                        onKeyDown={handleEnterNextField}
+                        onBlur={e => updateItem(idx, 'uraian', toTitleCase(e.target.value))}
+                        value={item.uraian}
+                        onChange={e => handleTitleCaseChange(e, (val) => updateItem(idx, 'uraian', val))}
+                        placeholder="..."
+                      />
+                    </div>
+
+                    <div className="flex gap-1.5">
+                      {['BAHAN', 'ALAT', 'JASA'].map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => updateItem(idx, 'klasifikasi', k)}
+                          className={`flex-1 py-1.5 rounded-xl text-[8px] font-black transition-all border ${
+                            item.klasifikasi === k 
+                            ? 'bg-white text-black border-white shadow-lg' 
+                            : 'bg-transparent text-white/20 border-white/5'
+                          }`}
+                        >
+                          {k}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Uraian Pekerjaan / Material</label>
-                        <input 
-                          type="text" 
-                          required
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
-                          onKeyDown={handleEnterNextField}
-                          onBlur={e => updateItem(idx, 'uraian', toTitleCase(e.target.value))}
-                          value={item.uraian}
-                          onChange={e => handleTitleCaseChange(e, (val) => updateItem(idx, 'uraian', val))}
-                          placeholder="..."
-                        />
-                      </div>
-
-                      <div className="flex gap-1.5">
-                        {['BAHAN', 'ALAT', 'JASA'].map((k) => (
-                          <button
-                            key={k}
-                            type="button"
-                            onClick={() => updateItem(idx, 'klasifikasi', k)}
-                            className={`flex-1 py-1.5 rounded-xl text-[8px] font-black transition-all border ${
-                              item.klasifikasi === k 
-                              ? 'bg-white text-black border-white shadow-lg' 
-                              : 'bg-transparent text-white/20 border-white/5'
-                            }`}
-                          >
-                            {k}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Jumlah</label>
-                          <input 
-                            type="number" 
-                            required
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
-                            onKeyDown={handleEnterNextField}
-                            onFocus={e => e.target.select()}
-                            value={item.jumlah === 0 ? '' : item.jumlah}
-                            onChange={e => updateItem(idx, 'jumlah', parseFloat(e.target.value) || 0)}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Satuan</label>
-                          <input 
-                            type="text" 
-                            required
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
-                            onKeyDown={handleEnterNextField}
-                            onBlur={e => updateItem(idx, 'satuan', toTitleCase(e.target.value))}
-                            value={item.satuan}
-                            onChange={e => handleTitleCaseChange(e, (val) => updateItem(idx, 'satuan', val))}
-                            placeholder="Satuan"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-black text-white/50 uppercase tracking-widest">Total Harga (Rp)</label>
+                        <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Jumlah</label>
                         <input 
                           type="number" 
                           required
-                          className="w-full bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-sm font-black text-white outline-none focus:bg-white/10 transition-all font-mono" 
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
                           onKeyDown={handleEnterNextField}
                           onFocus={e => e.target.select()}
-                          value={item.hargaTotal === 0 ? '' : item.hargaTotal}
-                          onChange={e => updateItem(idx, 'hargaTotal', parseFloat(e.target.value) || 0)}
+                          value={item.jumlah === 0 ? '' : item.jumlah}
+                          onChange={e => updateItem(idx, 'jumlah', parseFloat(e.target.value) || 0)}
                           placeholder="0"
                         />
                       </div>
-
-                      <div className="flex items-center justify-between px-1 text-[8px] font-black text-white/30 italic uppercase tracking-wider">
-                        <span>Hrg Satuan</span>
-                        <span>RP {item.hargaSatuan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-white/30 uppercase tracking-widest">Satuan</label>
+                        <input 
+                          type="text" 
+                          required
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
+                          onKeyDown={handleEnterNextField}
+                          onBlur={e => updateItem(idx, 'satuan', toTitleCase(e.target.value))}
+                          value={item.satuan}
+                          onChange={e => handleTitleCaseChange(e, (val) => updateItem(idx, 'satuan', val))}
+                          placeholder="Satuan"
+                        />
                       </div>
                     </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-white/50 uppercase tracking-widest">Total Harga (Rp)</label>
+                      <input 
+                        type="number" 
+                        required
+                        className="w-full bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-sm font-black text-white outline-none focus:bg-white/10 transition-all font-mono" 
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (idx === form.items.length - 1) {
+                              e.preventDefault();
+                              addItem();
+                              setTimeout(() => {
+                                const allInputs = document.querySelectorAll('input');
+                                const targetInput = Array.from(allInputs).filter(i => i.placeholder === '...').pop();
+                                targetInput?.focus();
+                              }, 50);
+                            } else {
+                              handleEnterNextField(e);
+                            }
+                          }
+                        }}
+                        onFocus={e => e.target.select()}
+                        value={item.hargaTotal === 0 ? '' : item.hargaTotal}
+                        onChange={e => updateItem(idx, 'hargaTotal', parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between px-1 text-[8px] font-black text-white/30 italic uppercase tracking-wider">
+                      <span>Hrg Satuan</span>
+                      <span>RP {item.hargaSatuan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-2xl border-t border-white/10 flex flex-col gap-3 rounded-b-[32px]">
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-zinc-900/90 backdrop-blur-3xl border-t border-white/10 flex flex-col gap-4 rounded-b-[40px] shadow-[0_-15px_40px_rgba(0,0,0,0.5)] shrink-0">
              <div className="flex items-center justify-between px-1">
                 <div className="space-y-0.5">
                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Total Nota</p>
-                   <p className="text-lg font-black italic text-white leading-none">RP {form.totalNota.toLocaleString()}</p>
+                   <p className="text-xl font-black italic text-white leading-none">RP {form.totalNota.toLocaleString()}</p>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center shadow-2xl">
                    <Check size={20} strokeWidth={4} />
                 </div>
              </div>
+             
              <button 
-              type="submit"
-              className="w-full bg-white text-black py-4 rounded-2xl font-black text-[11px] shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-widest"
+                type="submit"
+                className="w-full bg-white text-black py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(255,255,255,0.1)] font-black uppercase tracking-[0.2em] text-[10px]"
              >
-               <Send size={14} fill="currentColor" /> Simpan Nota
+                <Send size={16} fill="currentColor" />
+                <span>Simpan Nota</span>
              </button>
           </div>
         </form>
