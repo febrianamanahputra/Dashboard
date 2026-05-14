@@ -2092,16 +2092,20 @@ function FundsView({
     if (selectedEntries.length === 0) return alert('Pilih nota yang ingin dicopy');
 
     let tsv = '';
-    let globalNo = 1;
 
-    // Order by date ascending for copy
-    const sortedForCopy = [...selectedEntries].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+    // Order by notaNo ascending for copy (as requested: smallest to largest)
+    const sortedForCopy = [...selectedEntries].sort((a, b) => {
+      const numA = parseInt(a.notaNo) || 0;
+      const numB = parseInt(b.notaNo) || 0;
+      return numA - numB;
+    });
 
     sortedForCopy.forEach(nota => {
       nota.items.forEach((item: any, idx: number) => {
-        // Format: No, Tanggal, Uraian (item), (Kosong), Uraian (Item lagi), Klasifikasi, (Kosong), Jumlah, Satuan, Harga Satuan
+        // Format: No (notaNo), Tanggal, Uraian (item), (Kosong), Uraian (Item lagi), Klasifikasi, (Kosong), Jumlah, Satuan, Harga Satuan
+        // Use nota.notaNo for the first column of the first item in each nota
         const row = [
-          globalNo++,
+          idx === 0 ? nota.notaNo : '',
           idx === 0 ? nota.tanggal : '', // Only first item of the nota gets the date
           item.uraian, // Uraian (item)
           '',          // (Kosong)
@@ -2117,7 +2121,8 @@ function FundsView({
     });
 
     navigator.clipboard.writeText(tsv).then(() => {
-      alert('Data berhasil dicopy! Silahkan paste di Spreadsheet.');
+      // Automatically open the spreadsheet link as requested
+      window.open('https://docs.google.com/spreadsheets/d/1WAv_c-WCeBQyfGuVjEpdCJ_BHZFadn00/edit?gid=1428346177#gid=1428346177', '_blank');
     });
   };
 
