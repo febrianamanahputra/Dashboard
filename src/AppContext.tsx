@@ -52,6 +52,7 @@ interface AppContextType {
   markNotificationsAsRead: (role: 'SM' | 'SCM' | 'FINANCE' | 'RAP') => void;
   setRapData: (subId: string, data: RAPItem[]) => void;
   updateStock: (subId: string, stockId: string, newQuantity: number) => void;
+  addManualStock: (subId: string, materialName: string, quantity: number, unit: string) => void;
   addFieldFundEntry: (entry: Omit<FieldFundEntry, 'id' | 'createdAt'>) => void;
   deleteFieldFundEntry: (id: string) => void;
   addFieldFundDeposit: (deposit: Omit<FieldFundDeposit, 'id' | 'createdAt'>) => void;
@@ -565,6 +566,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const addManualStock = async (subId: string, materialName: string, quantity: number, unit: string) => {
+    try {
+      const q = query(
+        collection(db, `subs/${subId}/stock`), 
+        where('materialName', '==', materialName)
+      );
+      const stockSnapshot = await getDocs(q);
+      if (!stockSnapshot.empty) {
+        const sDoc = stockSnapshot.docs[0];
+        await updateDoc(sDoc.ref, {
+          quantity: (sDoc.data().quantity || 0) + quantity,
+          dateReceived: Date.now()
+        });
+      } else {
+        await addDoc(collection(db, `subs/${subId}/stock`), {
+          materialName,
+          quantity,
+          unit,
+          dateReceived: Date.now(),
+          subId
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `subs/${subId}/stock`);
+    }
+  };
+
   const addFieldFundEntry = async (entry: Omit<FieldFundEntry, 'id' | 'createdAt'>) => {
     try {
       await addDoc(collection(db, 'fieldFunds'), {
@@ -669,6 +697,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rapData,
       setRapData: updateRapData,
       updateStock,
+      addManualStock,
       addFieldFundEntry,
       deleteFieldFundEntry,
       addFieldFundDeposit,

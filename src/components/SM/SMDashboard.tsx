@@ -125,6 +125,7 @@ export default function SMDashboard() {
     removeSub,
     updateRequestStatus, 
     updateStock,
+    addManualStock,
     mainMaterials = []
   } = useApp();
   
@@ -147,6 +148,7 @@ export default function SMDashboard() {
   const [viewingHistorySubId, setViewingHistorySubId] = useState<string | null>(null);
   const [subStock, setSubStock] = useState<StockEntry[]>([]);
   const [receivingRequest, setReceivingRequest] = useState<MaterialRequest | null>(null);
+  const [showAddManualStock, setShowAddManualStock] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [viewingNota, setViewingNota] = useState<any>(null);
   const [activeView, setActiveView] = useState<'reports' | 'requests' | 'funds' | 'profile'>('requests');
@@ -157,7 +159,7 @@ export default function SMDashboard() {
     const hasOpenModal = !!(
       showAddForm || editingRequest || showMainRequestForm || selectedStock || 
       selectedRequestForDetail || receivingRequest || showAdd || viewingNota ||
-      showAddProfile || showAddSub || showEditProfile || showEditSub
+      showAddProfile || showAddSub || showEditProfile || showEditSub || showAddManualStock
     );
 
     const handlePopState = (e: PopStateEvent) => {
@@ -180,6 +182,7 @@ export default function SMDashboard() {
         setShowAddSub(false);
         setShowEditProfile(false);
         setShowEditSub(null);
+        setShowAddManualStock(false);
       } else if (view === 'rap') {
         setView('main');
       } else if (activeSubId) {
@@ -251,6 +254,26 @@ export default function SMDashboard() {
       };
     })
     .sort((a, b) => b.receivedAt - a.receivedAt);
+
+  const handleSendStockWA = () => {
+    if (!activeSubId) return;
+    const activeSub = subs.find(s => s.id === activeSubId);
+    const locationName = activeSub ? activeSub.name : 'Project';
+    const dateStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    
+    let message = `*Stock Material ${locationName}*\n\`${dateStr}\`\n________________________________________\n\n`;
+    
+    if (subStock.length === 0) {
+      message += "_Stok Kosong_";
+    } else {
+      subStock.sort((a,b) => a.materialName.localeCompare(b.materialName)).forEach(item => {
+        message += `> *${item.materialName}* ${item.quantity} ${item.unit}\n`;
+      });
+    }
+    
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+  };
 
   interface AggregatedTotal {
     materialName: string;
@@ -693,7 +716,23 @@ export default function SMDashboard() {
                         )}
                         {activeTab === 'stok' && (
                           <>
-                            <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Gudang Mini ({subStock.length})</h3>
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Gudang Mini ({subStock.length})</h3>
+                              <div className="flex gap-2">
+                                <button 
+                                  onClick={handleSendStockWA}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all hover:bg-emerald-500 hover:text-white"
+                                >
+                                  <Send size={12} /> LAPORKAN WA
+                                </button>
+                                <button 
+                                  onClick={() => setShowAddManualStock(true)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-black rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg"
+                                >
+                                  <Plus size={12} /> TAMBAH STOK
+                                </button>
+                              </div>
+                            </div>
                             {subStock.length === 0 ? (
                               <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
                                  <Box size={32} className="mb-2" />
@@ -891,6 +930,18 @@ export default function SMDashboard() {
               setShowDeleteConfirm(true);
             }}
             onDeleteSub={(sub) => setSubToDelete(sub)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAddManualStock && activeSubId && (
+          <ManualStockModal 
+            onClose={() => setShowAddManualStock(false)}
+            onSubmit={(name, qty, unit) => {
+              addManualStock(activeSubId, name, qty, unit);
+              setShowAddManualStock(false);
+            }}
           />
         )}
       </AnimatePresence>
@@ -3006,6 +3057,85 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
                 <span>Simpan Nota</span>
              </button>
           </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+function ManualStockModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (name: string, qty: number, unit: string) => void }) {
+  const [form, setForm] = useState({
+    name: '',
+    quantity: '',
+    unit: ''
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[400] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        className="bg-[#1a1a1a] border border-white/10 w-full max-w-sm rounded-[40px] p-8 shadow-2xl relative overflow-hidden"
+      >
+        <div className="flex items-center justify-between mb-8">
+          <h3 className="text-sm font-black text-white uppercase tracking-widest">Tambah Stok Manual</h3>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors"><X size={24} /></button>
+        </div>
+
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit(form.name, parseFloat(form.quantity) || 0, form.unit);
+        }} className="space-y-6">
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Nama Material</label>
+            <input 
+              required
+              type="text" 
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-sm font-black text-white outline-none focus:bg-white/10 transition-all"
+              onKeyDown={handleEnterNextField}
+              onBlur={e => setForm({...form, name: toTitleCase(e.target.value)})}
+              value={form.name}
+              onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, name: val}))}
+              placeholder="Contoh: Semen Padang"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Jumlah</label>
+              <input 
+                required
+                type="number" 
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-sm font-black text-white outline-none focus:bg-white/10 transition-all"
+                onKeyDown={handleEnterNextField}
+                onFocus={e => e.target.select()}
+                value={form.quantity}
+                onChange={e => setForm({...form, quantity: e.target.value})}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1">Satuan</label>
+              <input 
+                required
+                type="text"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-sm font-black text-white outline-none focus:bg-white/10 transition-all"
+                onKeyDown={handleEnterNextField}
+                onBlur={e => setForm({...form, unit: toTitleCase(e.target.value)})}
+                value={form.unit}
+                onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, unit: val}))}
+                placeholder="zak/ret/dus"
+              />
+            </div>
+          </div>
+
+          <button 
+            type="submit"
+            className="w-full mt-4 bg-white text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+          >
+            SIMPAN STOK
+          </button>
         </form>
       </motion.div>
     </div>
