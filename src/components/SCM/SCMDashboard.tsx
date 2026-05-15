@@ -754,9 +754,17 @@ const RequestItem: React.FC<{
                     </div>
                 )}
                 {request.status === 'awaiting_payment' && (
-                    <div className="flex-1 h-12 flex items-center justify-center gap-2 text-[11px] font-black text-white bg-white/10 border border-white/30 rounded-xl italic">
-                        <Wallet size={14} /> MENUNGGU ADMIN FINANCE
+                  <div className="flex-1 flex gap-2">
+                    <div className="flex-1 h-12 flex items-center justify-center gap-2 text-[10px] font-black text-white/60 bg-white/5 border border-white/10 rounded-xl italic px-2">
+                        <Wallet size={12} /> MENUNGGU FINANCE
                     </div>
+                    <ActionButton 
+                      label="APPROVE PEMBAYARAN" 
+                      icon={<CheckCircle2 size={14} />} 
+                      onClick={() => onStatusUpdate(request.id, 'paid')}
+                      className="flex-[2] bg-white text-indigo-600 shadow-xl" 
+                    />
+                  </div>
                 )}
 
                 {['pending', 'processing', 'awaiting_payment', 'paid'].includes(request.status) ? (

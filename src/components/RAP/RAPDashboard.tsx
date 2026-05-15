@@ -262,14 +262,14 @@ export default function RAPDashboard({ onBack, subId, stock }: RAPDashboardProps
                         <span className="text-xs font-black text-white uppercase tracking-tight">{item.materialName}</span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="text-[11px] font-black text-white/40">{Math.floor(item.quantity)}</span>
+                        <span className="text-[11px] font-black text-white/40">{Math.floor(item.quantity)} <span className="text-[8px] uppercase opacity-40 ml-0.5">{item.unit}</span></span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className="text-[11px] font-black text-white">{Math.floor(item.totalOrdered || 0)}</span>
+                        <span className="text-[11px] font-black text-white">{Math.floor(item.totalOrdered || 0)} <span className="text-[8px] uppercase opacity-40 ml-0.5">{item.unit}</span></span>
                       </td>
                       <td className="py-4 px-4 text-center">
                         <span className={`text-[11px] font-black ${getItemStock(item.materialName) > 0 ? 'text-green-400' : 'text-white/20 italic'}`}>
-                          {getItemStock(item.materialName)}
+                          {getItemStock(item.materialName)} <span className="text-[8px] uppercase opacity-40 ml-0.5">{item.unit}</span>
                         </span>
                       </td>
                     </tr>
