@@ -2886,7 +2886,16 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
                         type="text" 
                         required
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-3.5 py-3 text-xs font-black text-white outline-none focus:bg-white/10" 
-                        onKeyDown={handleEnterNextField}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const itemContainer = e.currentTarget.closest('.space-y-3');
+                            const inputs = itemContainer?.querySelectorAll('input');
+                            if (inputs && inputs.length > 1) {
+                              (inputs[1] as HTMLElement).focus();
+                            }
+                          }
+                        }}
                         onBlur={e => updateItem(idx, 'uraian', toTitleCase(e.target.value))}
                         value={item.uraian}
                         onChange={e => handleTitleCaseChange(e, (val) => updateItem(idx, 'uraian', val))}
