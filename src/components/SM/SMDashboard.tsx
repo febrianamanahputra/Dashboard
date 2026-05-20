@@ -152,7 +152,41 @@ export default function SMDashboard() {
   const [showAdd, setShowAdd] = useState(false);
   const [viewingNota, setViewingNota] = useState<any>(null);
   const [activeView, setActiveView] = useState<'reports' | 'requests' | 'funds' | 'profile'>('requests');
-  const [reportDrafts, setReportDrafts] = useState<Record<string, string[]>>({});
+  const [reportDrafts, setReportDrafts] = useState<Record<string, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem('reportDrafts');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('reportDrafts', JSON.stringify(reportDrafts));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [reportDrafts]);
+
+  // Auto-scroll focused fields into view center (ideal for mobile keyboards)
+  React.useEffect(() => {
+    const handleFocus = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')
+      ) {
+        setTimeout(() => {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
+      }
+    };
+    document.addEventListener('focusin', handleFocus);
+    return () => {
+      document.removeEventListener('focusin', handleFocus);
+    };
+  }, []);
 
   // Back Button Navigation Support for Android/Mobile Browser
   React.useEffect(() => {
@@ -1338,7 +1372,7 @@ function ReportView({
     let message = '';
     if (mode === 'full') {
       const validLines = rows.filter(r => r.trim()).map(r => 
-        isAfternoon ? `> Pek. ${r.trim()}` : `- Pek. ${r.trim()}`
+        `> Pek. ${r.trim()}`
       );
       if (validLines.length === 0) return alert('Input laporan terlebih dahulu');
       
@@ -1350,7 +1384,7 @@ function ReportView({
     } else if (lineIndex !== undefined) {
       const lineText = rows[lineIndex].trim();
       if (!lineText) return;
-      message = isAfternoon ? `> Pek. ${lineText}` : `- Pek. ${lineText}`;
+      message = `> Pek. ${lineText}`;
     }
 
     const encodedMessage = encodeURIComponent(message);
@@ -2160,8 +2194,8 @@ function FundsView({
   
   const subDeposits = fieldFundDeposits.filter(d => d.subId === subId);
   
-  const totalExpenses = subFunds.reduce((acc, f) => acc + (f.totalNota || 0), 0);
-  const totalDeposits = subDeposits.reduce((acc, d) => acc + (d.type === 'out' ? -d.amount : d.amount), 0);
+  const totalExpenses = subFunds.reduce((acc, f) => acc + (Number(f.totalNota || f.total_nota || 0)), 0);
+  const totalDeposits = subDeposits.reduce((acc, d) => acc + (d.type === 'out' ? -(Number(d.amount) || 0) : (Number(d.amount) || 0)), 0);
   const currentBalance = totalDeposits - totalExpenses;
 
   const lastNotaNo = subFunds.length > 0 ? subFunds[0].notaNo : '';
@@ -2905,7 +2939,7 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar pb-[140px] space-y-4">
+          <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar pb-24 space-y-4">
             <div className="flex items-center justify-between px-1 bg-transparent sticky top-0 py-2 z-20 backdrop-blur-md">
               <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Item Nota</p>
               <button 
@@ -3038,23 +3072,18 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-6 bg-zinc-900/90 backdrop-blur-3xl border-t border-white/10 flex flex-col gap-4 rounded-b-[40px] shadow-[0_-15px_40px_rgba(0,0,0,0.5)] shrink-0">
-             <div className="flex items-center justify-between px-1">
-                <div className="space-y-0.5">
-                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Total Nota</p>
-                   <p className="text-xl font-black italic text-white leading-none">RP {form.totalNota.toLocaleString()}</p>
-                </div>
-                <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center shadow-2xl">
-                   <Check size={20} strokeWidth={4} />
-                </div>
+          <div className="absolute bottom-0 left-0 right-0 px-5 py-3.5 bg-zinc-950/95 backdrop-blur-3xl border-t border-white/10 flex items-center justify-between rounded-b-[40px] shadow-[0_-10px_30px_rgba(0,0,0,0.5)] shrink-0">
+             <div className="space-y-0.5">
+                <p className="text-[8px] font-black text-white/40 uppercase tracking-widest leading-none">Total Nota</p>
+                <p className="text-base font-black italic text-white leading-none">RP {form.totalNota.toLocaleString()}</p>
              </div>
              
              <button 
                 type="submit"
-                className="w-full bg-white text-black py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-[0.98] transition-all shadow-[0_10px_30px_rgba(255,255,255,0.1)] font-black uppercase tracking-[0.2em] text-[10px]"
+                className="w-11 h-11 bg-white hover:bg-neutral-200 text-black rounded-2xl flex items-center justify-center active:scale-[0.95] transition-all shadow-xl"
+                title="Simpan Nota"
              >
-                <Send size={16} fill="currentColor" />
-                <span>Simpan Nota</span>
+                <Send size={15} fill="currentColor" />
              </button>
           </div>
         </form>
