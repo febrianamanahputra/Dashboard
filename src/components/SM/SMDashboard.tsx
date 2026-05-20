@@ -2940,17 +2940,6 @@ function FundEntryModal({ subId, onClose, onSubmit, lastNotaNo }: any) {
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-4 custom-scrollbar pb-24 space-y-4">
-            <div className="flex items-center justify-between px-1 bg-transparent sticky top-0 py-2 z-20 backdrop-blur-md">
-              <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Item Nota</p>
-              <button 
-                type="button"
-                onClick={addItem}
-                className="text-[8px] font-black text-white uppercase tracking-widest bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 hover:bg-white/20 transition-all active:scale-95"
-              >
-                + Tambah
-              </button>
-            </div>
-
             <div className="space-y-4">
               {form.items.map((item, idx) => (
                 <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-2xl relative shadow-sm">
