@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../AppContext';
 import { db } from '../../lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle, Truck, Check, Banknote, MessageCircle, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Package, MapPin, X, AlertTriangle, HardHat, FileSpreadsheet, CheckCircle2, Trash2, Edit2, Camera, UserCircle, History, BarChart3, Box, Clock, Target, PlusSquare, RefreshCw, ClipboardList, Wallet, Send, Settings, Table, FileText, Landmark, Circle, Truck, Check, Banknote, MessageCircle, ChevronLeft, ChevronRight, ArrowUp, ArrowDown, Search } from 'lucide-react';
 import { StockEntry, MaterialRequest, RequestStatus } from '../../types';
 
 const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
@@ -125,6 +125,7 @@ export default function SMDashboard() {
     removeSub,
     updateRequestStatus, 
     updateStock,
+    deleteStock,
     addManualStock,
     mainMaterials = []
   } = useApp();
@@ -142,6 +143,8 @@ export default function SMDashboard() {
   const [selectedStock, setSelectedStock] = useState<StockEntry | null>(null);
   const [selectedRequestForDetail, setSelectedRequestForDetail] = useState<MaterialRequest | null>(null);
   const [editQuantity, setEditQuantity] = useState<string>('');
+  const [editUnit, setEditUnit] = useState<string>('');
+  const [stockSearchQuery, setStockSearchQuery] = useState<string>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [view, setView] = useState<'main' | 'rap'>('main');
   const [activeTab, setActiveTab] = useState<'active' | 'riwayat' | 'total' | 'stok'>('active');
@@ -748,57 +751,108 @@ export default function SMDashboard() {
                             </div>
                           </>
                         )}
-                        {activeTab === 'stok' && (
-                          <>
-                            <div className="flex items-center justify-between mb-2">
-                              <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Gudang Mini ({subStock.length})</h3>
-                              <div className="flex gap-2">
-                                <button 
-                                  onClick={handleSendStockWA}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all hover:bg-emerald-500 hover:text-white"
-                                >
-                                  <Send size={12} /> LAPORKAN WA
-                                </button>
-                                <button 
-                                  onClick={() => setShowAddManualStock(true)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-black rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg"
-                                >
-                                  <Plus size={12} /> TAMBAH STOK
-                                </button>
-                              </div>
-                            </div>
-                            {subStock.length === 0 ? (
-                              <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
-                                 <Box size={32} className="mb-2" />
-                                 <p className="text-xs font-bold uppercase tracking-widest">Stok kosong</p>
-                              </div>
-                            ) : (
-                              <div className="space-y-1 mt-2">
-                                {subStock.map((entry) => (
-                                  <motion.button 
-                                    layout 
-                                    key={entry.id} 
-                                    onClick={() => { setSelectedStock(entry); setEditQuantity(entry.quantity.toString()); }} 
-                                    className="w-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-between p-4 rounded-2xl active:scale-[0.98] transition-all group hover:bg-white/20 shadow-xl"
+                        {activeTab === 'stok' && (() => {
+                          const sortedStock = [...subStock]
+                            .filter(entry => entry.materialName.toLowerCase().includes(stockSearchQuery.toLowerCase()))
+                            .sort((a, b) => a.materialName.localeCompare(b.materialName, 'id', { sensitivity: 'base' }));
+
+                          const renderedStockWithDividers: React.ReactNode[] = [];
+                          let lastLetter = '';
+
+                          sortedStock.forEach((entry) => {
+                            const currentLetter = entry.materialName.trim().charAt(0).toUpperCase();
+                            if (currentLetter !== lastLetter) {
+                              lastLetter = currentLetter;
+                              renderedStockWithDividers.push(
+                                <div key={`letter-divider-${currentLetter}`} className="py-2 px-1 flex items-center gap-2 select-none">
+                                  <span className="text-[10px] font-black text-white/50 bg-white/10 w-5 h-5 rounded-md flex items-center justify-center border border-white/5">
+                                    {currentLetter}
+                                  </span>
+                                  <div className="h-[1px] flex-1 bg-white/5" />
+                                </div>
+                              );
+                            }
+                            renderedStockWithDividers.push(
+                              <motion.button 
+                                layout 
+                                key={entry.id} 
+                                onClick={() => { setSelectedStock(entry); setEditQuantity(entry.quantity.toString()); setEditUnit(entry.unit); }} 
+                                className="w-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-between p-4 rounded-2xl active:scale-[0.98] transition-all group hover:bg-white/20 shadow-xl"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 text-white/40">
+                                    <Box size={14} />
+                                  </div>
+                                  <div className="text-left text-white">
+                                    <p className="font-black text-xs tracking-tight">{entry.materialName}</p>
+                                    <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">Update: {new Date(entry.dateReceived).toLocaleDateString('id-ID')}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-black italic text-white">{entry.quantity} <span className="text-[10px] text-white/40 uppercase font-black">{entry.unit}</span></p>
+                                </div>
+                              </motion.button>
+                            );
+                          });
+
+                          return (
+                            <>
+                              <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Gudang Mini ({subStock.length})</h3>
+                                <div className="flex gap-2">
+                                  <button 
+                                    onClick={handleSendStockWA}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all hover:bg-emerald-500 hover:text-white"
                                   >
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 text-white/40">
-                                        <Box size={14} />
-                                      </div>
-                                      <div className="text-left text-white">
-                                        <p className="font-black text-xs tracking-tight">{entry.materialName}</p>
-                                        <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">Update: {new Date(entry.dateReceived).toLocaleDateString('id-ID')}</p>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-sm font-black italic text-white">{entry.quantity} <span className="text-[10px] text-white/40 uppercase font-black">{entry.unit}</span></p>
-                                    </div>
-                                  </motion.button>
-                                ))}
+                                    <Send size={12} /> LAPORKAN WA
+                                  </button>
+                                  <button 
+                                    onClick={() => setShowAddManualStock(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-black rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg"
+                                  >
+                                    <Plus size={12} /> TAMBAH STOK
+                                  </button>
+                                </div>
                               </div>
-                            )}
-                          </>
-                        )}
+
+                              <div className="relative mb-3">
+                                <input 
+                                  type="text" 
+                                  placeholder="Cari material..." 
+                                  value={stockSearchQuery}
+                                  onChange={(e) => setStockSearchQuery(e.target.value)}
+                                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white outline-none focus:bg-white/10 focus:border-white/20 transition-all placeholder:text-white/30"
+                                />
+                                <Search size={14} className="absolute left-3.5 top-3.5 text-white/30" />
+                                {stockSearchQuery && (
+                                  <button 
+                                    onClick={() => setStockSearchQuery('')}
+                                    className="absolute right-3.5 top-3.5 text-white/40 hover:text-white"
+                                    type="button"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {subStock.length === 0 ? (
+                                <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
+                                   <Box size={32} className="mb-2" />
+                                   <p className="text-xs font-bold uppercase tracking-widest">Stok kosong</p>
+                                </div>
+                              ) : sortedStock.length === 0 ? (
+                                <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
+                                   <Box size={32} className="mb-2" />
+                                   <p className="text-xs font-bold uppercase tracking-widest">Tidak ada material cocok</p>
+                                </div>
+                              ) : (
+                                <div className="space-y-1 mt-2">
+                                  {renderedStockWithDividers}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1111,10 +1165,10 @@ export default function SMDashboard() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white/20 backdrop-blur-2xl w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col border border-white/20"
+              className="bg-zinc-900 border border-white/10 w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col"
             >
               <div className="px-8 py-8 border-b border-white/10 text-center">
-                 <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mx-auto mb-4 border border-white/20 text-white shadow-xl">
+                 <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4 border border-white/10 text-white shadow-xl">
                     <Box size={32} />
                  </div>
                  <h2 className="text-xl font-black tracking-tight mb-1 text-white">{selectedStock.materialName}</h2>
@@ -1122,13 +1176,13 @@ export default function SMDashboard() {
               </div>
 
               <div className="p-8 space-y-6">
-                <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/10 text-center">
+                <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/5 text-center">
                    <p className="text-4xl font-black italic tracking-tighter text-white mb-1">{selectedStock.quantity}</p>
                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{selectedStock.unit}</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                   <div className="flex items-center justify-between px-4 py-3 bg-white/10 rounded-xl">
+                   <div className="flex items-center justify-between px-4 py-3 bg-white/5 border border-white/5 rounded-xl">
                       <span className="text-[10px] font-bold text-white/40 uppercase">Terakhir Update</span>
                       <span className="text-xs font-bold text-white">{new Date(selectedStock.dateReceived).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                    </div>
@@ -1136,34 +1190,66 @@ export default function SMDashboard() {
                 
                 <div className="space-y-3 pt-4">
                   <div className="flex flex-col gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Koreksi Jumlah Manual</label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="number"
-                          className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-4 text-lg font-black text-white focus:ring-2 focus:ring-white/40 outline-none transition-all"
-                          onKeyDown={handleEnterNextField}
-                          onFocus={e => e.target.select()}
-                          value={editQuantity}
-                          onChange={(e) => setEditQuantity(e.target.value)}
-                        />
+                    <div className="space-y-3">
+                      <div className="flex gap-3">
+                        <div className="flex-1 space-y-1">
+                          <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Jumlah</label>
+                          <input 
+                            type="number"
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white focus:ring-2 focus:ring-white/40 outline-none transition-all"
+                            onKeyDown={handleEnterNextField}
+                            onFocus={e => e.target.select()}
+                            value={editQuantity}
+                            onChange={(e) => setEditQuantity(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <label className="text-[10px] font-bold text-ig-grey uppercase tracking-widest ml-1">Satuan</label>
+                          <input 
+                            type="text"
+                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm font-black text-white focus:ring-2 focus:ring-white/40 outline-none transition-all placeholder:text-white/20 capitalize"
+                            onKeyDown={handleEnterNextField}
+                            onFocus={e => e.target.select()}
+                            value={editUnit}
+                            onChange={(e) => setEditUnit(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 pt-2">
                         <button 
                           onClick={() => {
                             if (activeSubId && selectedStock) {
-                              updateStock(activeSubId, selectedStock.id, parseFloat(editQuantity) || 0);
+                              updateStock(activeSubId, selectedStock.id, parseFloat(editQuantity) || 0, editUnit);
                               setSelectedStock(null);
                             }
                           }}
-                          className="bg-ig-black text-white px-6 rounded-2xl font-black text-sm shadow-lg shadow-black/10 active:scale-95 transition-all"
+                          className="w-full bg-white text-black py-4 rounded-2xl font-black text-xs shadow-lg active:scale-95 hover:bg-neutral-200 transition-all text-center uppercase tracking-widest"
                         >
-                          UPDATE
+                          SIMPAN PERUBAHAN
                         </button>
+
+                        {(parseFloat(editQuantity) === 0 || selectedStock.quantity === 0) && (
+                          <button 
+                            onClick={() => {
+                              if (confirm(`Yakin ingin menghapus stok ${selectedStock.materialName} karena sudah kosong?`)) {
+                                if (activeSubId && selectedStock) {
+                                  deleteStock(activeSubId, selectedStock.id);
+                                  setSelectedStock(null);
+                                }
+                              }
+                            }}
+                            className="w-full bg-red-500/15 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white py-4 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 shadow-lg shadow-red-500/10"
+                          >
+                            <Trash2 size={14} /> HAPUS STOK
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
                   <button 
                     onClick={() => setSelectedStock(null)}
-                    className="w-full py-4 text-[10px] font-bold text-ig-grey uppercase tracking-widest mt-4"
+                    className="w-full py-4 text-[10px] font-bold text-ig-grey hover:text-white uppercase tracking-widest mt-4"
                   >
                     KEMBALI
                   </button>

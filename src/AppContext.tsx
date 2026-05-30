@@ -51,7 +51,8 @@ interface AppContextType {
   dismissNotification: (id: string) => void;
   markNotificationsAsRead: (role: 'SM' | 'SCM' | 'FINANCE' | 'RAP') => void;
   setRapData: (subId: string, data: RAPItem[]) => void;
-  updateStock: (subId: string, stockId: string, newQuantity: number) => void;
+  updateStock: (subId: string, stockId: string, newQuantity: number, newUnit?: string) => void;
+  deleteStock: (subId: string, stockId: string) => void;
   addManualStock: (subId: string, materialName: string, quantity: number, unit: string) => void;
   addFieldFundEntry: (entry: Omit<FieldFundEntry, 'id' | 'createdAt'>) => void;
   deleteFieldFundEntry: (id: string) => void;
@@ -558,11 +559,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateStock = async (subId: string, stockId: string, newQuantity: number) => {
+  const updateStock = async (subId: string, stockId: string, newQuantity: number, newUnit?: string) => {
     try {
-      await updateDoc(doc(db, `subs/${subId}/stock`, stockId), { quantity: newQuantity });
+      const updateData: { quantity: number; unit?: string } = { quantity: newQuantity };
+      if (newUnit !== undefined) {
+        updateData.unit = newUnit;
+      }
+      await updateDoc(doc(db, `subs/${subId}/stock`, stockId), updateData);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `subs/${subId}/stock/${stockId}`);
+    }
+  };
+
+  const deleteStock = async (subId: string, stockId: string) => {
+    try {
+      await deleteDoc(doc(db, `subs/${subId}/stock`, stockId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `subs/${subId}/stock/${stockId}`);
     }
   };
 
@@ -697,6 +710,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rapData,
       setRapData: updateRapData,
       updateStock,
+      deleteStock,
       addManualStock,
       addFieldFundEntry,
       deleteFieldFundEntry,
