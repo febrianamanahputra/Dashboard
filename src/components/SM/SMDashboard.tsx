@@ -277,8 +277,24 @@ export default function SMDashboard() {
 
   const subRequests = requests.filter(r => r.subId === activeSubId);
   
+  const STATUS_ORDER: Record<string, number> = {
+    pending: 1,
+    processing: 2,
+    awaiting_payment: 3,
+    paid: 4,
+    delivered: 5,
+    on_hold: 6,
+    received: 7,
+  };
+
   // Tab filtered data
-  const activeRequests = subRequests.filter(r => r.status !== 'received' && r.status !== 'on_hold');
+  const activeRequests = subRequests
+    .filter(r => r.status !== 'received' && r.status !== 'on_hold')
+    .sort((a, b) => {
+      const wa = STATUS_ORDER[a.status] || 99;
+      const wb = STATUS_ORDER[b.status] || 99;
+      return wa - wb;
+    });
   const onHoldRequests = subRequests.filter(r => r.status === 'on_hold');
   
   const historyRequests = subRequests
@@ -308,6 +324,22 @@ export default function SMDashboard() {
       });
     }
     
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+  };
+
+  const handleRequestWA = () => {
+    const pendingReqs = subRequests.filter(r => r.status === 'pending');
+    if (pendingReqs.length === 0) {
+      alert("Tidak ada material berstatus 'Belum Di Proses' saat ini.");
+      return;
+    }
+
+    const itemsText = pendingReqs.map(req => `\n- ${req.materialName} (${req.quantity} ${req.unit})`).join('');
+    const message = `Bismillah, Pak saya telah mengorder${itemsText}
+
+Mohon Di proses`;
+
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
   };
@@ -369,45 +401,59 @@ export default function SMDashboard() {
     switch (s) {
       case 'pending': 
         return {
-          bg: 'bg-transparent',
+          bg: 'bg-white/5 backdrop-blur-md border border-white/10',
           text: 'text-white',
-          badge: 'bg-white/10 text-white border-white/20',
-          watermark: null
+          badge: 'bg-white/5 text-white border-white/10',
+          watermark: <Clock size={80} className="absolute -right-4 -bottom-4 text-white/5 rotate-12" />
         };
       case 'processing':
         return {
-          bg: 'bg-transparent',
-          text: 'text-white',
-          badge: 'bg-white/10 text-white border-white/20',
-          watermark: null
+          bg: 'bg-gradient-to-br from-[#FF8C00]/20 to-[#FF4500]/20 backdrop-blur-md border border-orange-500/20',
+          text: 'text-orange-100',
+          badge: 'bg-orange-500/20 text-orange-200 border-orange-500/30',
+          watermark: <RefreshCw size={80} className="absolute -right-4 -bottom-4 text-orange-500/10 rotate-12" />
         };
       case 'awaiting_payment':
         return {
-          bg: 'bg-transparent',
-          text: 'text-white',
-          badge: 'bg-white/10 text-white border-white/20',
-          watermark: null
+          bg: 'bg-gradient-to-br from-[#2E0854]/20 to-[#4B0082]/20 backdrop-blur-md border border-purple-500/20',
+          text: 'text-purple-100',
+          badge: 'bg-purple-500/20 text-purple-200 border-purple-500/30',
+          watermark: <Wallet size={80} className="absolute -right-4 -bottom-4 text-purple-500/10 rotate-12" />
         };
       case 'paid':
         return {
-          bg: 'bg-transparent',
-          text: 'text-white',
-          badge: 'bg-white/10 text-white border-white/20',
-          watermark: null
+          bg: 'bg-gradient-to-br from-[#8A2BE2]/20 to-[#B06AB3]/20 backdrop-blur-md border border-indigo-500/20',
+          text: 'text-indigo-100',
+          badge: 'bg-indigo-500/20 text-indigo-200 border-indigo-500/30',
+          watermark: <CheckCircle2 size={80} className="absolute -right-4 -bottom-4 text-indigo-500/10 rotate-12" />
         };
       case 'delivered':
         return {
-          bg: 'bg-transparent',
-          text: 'text-white',
-          badge: 'bg-white/10 text-white border-white/20',
-          watermark: null
+          bg: 'bg-gradient-to-br from-[#25D366]/20 to-[#128C7E]/20 backdrop-blur-md border border-green-500/20',
+          text: 'text-green-100',
+          badge: 'bg-green-500/20 text-green-200 border-green-500/30',
+          watermark: <Truck size={80} className="absolute -right-4 -bottom-4 text-green-500/10 rotate-12" />
+        };
+      case 'received':
+        return {
+          bg: 'bg-gradient-to-br from-[#0F9D58]/20 to-[#00574B]/20 backdrop-blur-md border border-emerald-500/20',
+          text: 'text-emerald-100',
+          badge: 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
+          watermark: <CheckCircle2 size={80} className="absolute -right-4 -bottom-4 text-emerald-500/10 rotate-12" />
+        };
+      case 'on_hold':
+        return {
+          bg: 'bg-gradient-to-br from-[#DB4437]/20 to-[#7D1B1B]/20 backdrop-blur-md border border-red-500/20',
+          text: 'text-red-100',
+          badge: 'bg-red-500/20 text-red-200 border-red-500/30',
+          watermark: <AlertTriangle size={80} className="absolute -right-4 -bottom-4 text-red-500/10 rotate-12" />
         };
       default:
         return {
-          bg: 'bg-transparent',
+          bg: 'bg-white/5 backdrop-blur-md border border-white/10',
           text: 'text-white',
-          badge: 'bg-white/10 text-white border-white/20',
-          watermark: null
+          badge: 'bg-white/5 text-white border-white/10',
+          watermark: <Package size={80} className="absolute -right-4 -bottom-4 text-white/5 rotate-12" />
         };
     }
   };
@@ -550,6 +596,19 @@ export default function SMDashboard() {
                           >
                             <PlusSquare size={18} strokeWidth={2.5} />
                             <span className="text-[10px] font-black uppercase tracking-widest">Request Material</span>
+                          </button>
+                          <div className="w-[1px] h-6 bg-white/20 mx-1" />
+                          <button 
+                            onClick={handleRequestWA}
+                            disabled={!activeSubId}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all ${
+                              !activeSubId 
+                              ? 'opacity-20 cursor-not-allowed text-white/50' 
+                              : 'text-[#25D366] hover:bg-white/10'
+                            }`}
+                          >
+                            <MessageCircle size={18} strokeWidth={2.5} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Request WA</span>
                           </button>
                         </div>
                       </div>

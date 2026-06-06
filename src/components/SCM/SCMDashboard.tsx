@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../../AppContext';
-import { Truck, Package, Clock, CheckCircle2, CreditCard, ChevronRight, Pause, Play, X, Send, History, Check, AlertTriangle, Trash2, Plus, RefreshCw, FileSpreadsheet, Wallet } from 'lucide-react';
+import { Truck, Package, Clock, CheckCircle2, CreditCard, ChevronRight, Pause, Play, X, Send, History, Check, AlertTriangle, Trash2, Plus, RefreshCw, FileSpreadsheet, Wallet, LayoutGrid, List } from 'lucide-react';
 import { RequestStatus, MaterialRequest } from '../../types';
 
 const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
@@ -90,20 +90,56 @@ export default function SCMDashboard() {
     syncDirectToSheet
   } = useApp();
   const [showPaymentModal, setShowPaymentModal] = useState<MaterialRequest | null>(null);
+  const [showBulkPaymentModal, setShowBulkPaymentModal] = useState<MaterialRequest[] | null>(null);
   const [showMainMaterialModal, setShowMainMaterialModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [viewingHistorySubId, setViewingHistorySubId] = useState<string | null>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'list' | 'thumbnail'>('list');
+  const [selectedStatusDetail, setSelectedStatusDetail] = useState<{ subId: string; status: RequestStatus } | null>(null);
+
+  const selectedRequests = requests.filter(r => selectedItemIds.includes(r.id));
+  const hasSelection = selectedRequests.length > 0;
+  const uniqueStatuses = Array.from(new Set(selectedRequests.map(r => r.status))) as RequestStatus[];
+  const allSelectedHaveSameStatus = uniqueStatuses.length === 1;
+  const commonStatus = allSelectedHaveSameStatus ? uniqueStatuses[0] : null;
+  const showFloatingActionBoard = hasSelection && allSelectedHaveSameStatus;
+
+  const handleBulkProcess = async () => {
+    for (const req of selectedRequests) {
+      updateRequestStatus(req.id, 'processing');
+    }
+    setSelectedItemIds([]);
+  };
+
+  const handleBulkApprovePayment = async () => {
+    for (const req of selectedRequests) {
+      updateRequestStatus(req.id, 'paid');
+    }
+    setSelectedItemIds([]);
+  };
+
+  const handleBulkShip = async () => {
+    for (const req of selectedRequests) {
+      updateRequestStatus(req.id, 'delivered');
+    }
+    setSelectedItemIds([]);
+  };
 
   useEffect(() => {
-    const hasOpenModal = !!(showPaymentModal || showMainMaterialModal);
+    const hasOpenModal = !!(showPaymentModal || showBulkPaymentModal || showMainMaterialModal || selectedStatusDetail);
 
     const handlePopState = (e: PopStateEvent) => {
       if (e.state && !e.state.isSubNav && e.state.role === null) return;
 
       if (showPaymentModal) {
         setShowPaymentModal(null);
+      } else if (showBulkPaymentModal) {
+        setShowBulkPaymentModal(null);
       } else if (showMainMaterialModal) {
         setShowMainMaterialModal(false);
+      } else if (selectedStatusDetail) {
+        setSelectedStatusDetail(null);
       } else if (viewingHistorySubId) {
         setViewingHistorySubId(null);
       } else if (activeTab !== 'active') {
@@ -117,7 +153,7 @@ export default function SCMDashboard() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [showPaymentModal, showMainMaterialModal, activeTab, viewingHistorySubId]);
+  }, [showPaymentModal, showBulkPaymentModal, showMainMaterialModal, activeTab, viewingHistorySubId, selectedStatusDetail]);
 
   const getStatusLabel = (s: string) => {
     switch (s) {
@@ -142,6 +178,19 @@ export default function SCMDashboard() {
       case 'received': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case 'on_hold': return 'bg-red-500/10 text-red-400 border-red-500/20';
       default: return 'bg-white/5 text-white border-white/10';
+    }
+  };
+
+  const getStatusHexColor = (s: string) => {
+    switch (s) {
+      case 'pending': return '#EAB308';
+      case 'processing': return '#F97316';
+      case 'awaiting_payment': return '#A855F7';
+      case 'paid': return '#6366F1';
+      case 'delivered': return '#22C55E';
+      case 'received': return '#10B981';
+      case 'on_hold': return '#EF4444';
+      default: return '#9CA3AF';
     }
   };
 
@@ -192,12 +241,31 @@ export default function SCMDashboard() {
     }
   };
 
+  const STATUS_ORDER: Record<string, number> = {
+    pending: 1,
+    processing: 2,
+    awaiting_payment: 3,
+    paid: 4,
+    delivered: 5,
+    on_hold: 6,
+    received: 7,
+  };
+
   const relevantRequests = requests.filter(r => r.status !== 'received');
 
-  const subsWithRequests = subs.map(sub => ({
-    ...sub,
-    requests: relevantRequests.filter(r => r.subId === sub.id)
-  })).filter(sub => sub.requests.length > 0);
+  const subsWithRequests = subs.map(sub => {
+    const sortedRequests = relevantRequests
+      .filter(r => r.subId === sub.id)
+      .sort((a, b) => {
+        const wa = STATUS_ORDER[a.status] || 99;
+        const wb = STATUS_ORDER[b.status] || 99;
+        return wa - wb;
+      });
+    return {
+      ...sub,
+      requests: sortedRequests
+    };
+  }).filter(sub => sub.requests.length > 0);
 
   // History extraction per sub
   const historyBySub = subs.map(sub => {
@@ -215,7 +283,13 @@ export default function SCMDashboard() {
     return { ...sub, history: receivedReqs };
   }).filter(sub => sub.history.length > 0);
 
-  const orphanedRequests = relevantRequests.filter(r => !subs.some(s => s.id === r.subId));
+  const orphanedRequests = relevantRequests
+    .filter(r => !subs.some(s => s.id === r.subId))
+    .sort((a, b) => {
+      const wa = STATUS_ORDER[a.status] || 99;
+      const wb = STATUS_ORDER[b.status] || 99;
+      return wa - wb;
+    });
 
   return (
     <div className="relative h-full flex flex-col pt-[env(safe-area-inset-top)]">
@@ -256,15 +330,36 @@ export default function SCMDashboard() {
           </div>
           
           {activeTab === 'active' && (
-            <div className="flex items-center gap-3">
-              <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between">
-                 <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Antrian</p>
-                 <p className="text-sm font-black italic text-white">{relevantRequests.length}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between">
+                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Antrian</p>
+                   <p className="text-sm font-black italic text-white">{relevantRequests.length}</p>
+                </div>
+
+                <div className="flex-1 bg-white/10 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between">
+                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Menunggu</p>
+                   <p className="text-sm font-black italic text-white">{relevantRequests.filter(r => r.status === 'pending').length}</p>
+                </div>
               </div>
 
-              <div className="flex-1 bg-white/10 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between">
-                 <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Menunggu</p>
-                 <p className="text-sm font-black italic text-white">{relevantRequests.filter(r => r.status === 'pending').length}</p>
+              <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white text-black shadow-lg shadow-white/10' : 'text-white/40 hover:text-white'}`}
+                  title="List View"
+                >
+                  <List size={16} strokeWidth={2.5} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('thumbnail')}
+                  className={`p-2 rounded-xl transition-all ${viewMode === 'thumbnail' ? 'bg-white text-black shadow-lg shadow-white/10' : 'text-white/40 hover:text-white'}`}
+                  title="Thumbnail View"
+                >
+                  <LayoutGrid size={16} strokeWidth={2.5} />
+                </button>
               </div>
             </div>
           )}
@@ -281,69 +376,218 @@ export default function SCMDashboard() {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4 space-y-8">
-              <div className="space-y-6">
-                {subsWithRequests.map((sub, idx) => {
-                  const profile = profiles.find(p => p.id === sub.profileId);
-                  return (
-                    <motion.div 
-                      key={sub.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.1 }}
-                      className="space-y-4"
-                    >
-                      <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_10px_white]" />
-                          <h3 className="text-sm font-black tracking-tight text-white uppercase">
-                            {profile?.name} - {sub.name}
-                          </h3>
+              {viewMode === 'list' ? (
+                <div className="space-y-6">
+                  {subsWithRequests.map((sub, idx) => {
+                    const profile = profiles.find(p => p.id === sub.profileId);
+                    return (
+                      <motion.div 
+                        key={sub.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="space-y-4"
+                      >
+                        <div className="flex items-center justify-between px-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_10px_white]" />
+                            <h3 className="text-sm font-black tracking-tight text-white uppercase">
+                              {profile?.name} - {sub.name}
+                            </h3>
+                          </div>
+                          <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{sub.requests.length} Request</span>
                         </div>
-                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{sub.requests.length} Request</span>
-                      </div>
 
-                      <div className="space-y-4">
-                        {sub.requests.map((req) => (
-                          <RequestItem 
-                            key={req.id} 
-                            request={req} 
-                            onStatusUpdate={updateRequestStatus} 
-                            onApproveEdit={approveEdit} 
-                            onRejectEdit={rejectEdit} 
-                            onRequestPayment={setShowPaymentModal} 
-                            locationName={`${profile?.name} - ${sub.name}`}
-                            theme={getRequestTheme(req.status)}
-                            statusLabel={getStatusLabel(req.status)}
-                          />
-                        ))}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+                        <div className="space-y-4">
+                          {sub.requests.map((req) => {
+                            const isChecked = selectedItemIds.includes(req.id);
+                            return (
+                              <div key={req.id} className="flex items-center gap-3 w-full">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isChecked) {
+                                      setSelectedItemIds(prev => prev.filter(id => id !== req.id));
+                                    } else {
+                                      setSelectedItemIds(prev => [...prev, req.id]);
+                                    }
+                                  }}
+                                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                                    isChecked 
+                                      ? 'bg-white border-white text-black shadow-lg shadow-white/20 scale-105' 
+                                      : 'border-white/20 bg-white/5 hover:border-white/45'
+                                  }`}
+                                  title="Pilih Item"
+                                >
+                                  {isChecked && <Check size={14} strokeWidth={4} />}
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                  <RequestItem 
+                                    request={req} 
+                                    onStatusUpdate={updateRequestStatus} 
+                                    onApproveEdit={approveEdit} 
+                                    onRejectEdit={rejectEdit} 
+                                    onRequestPayment={setShowPaymentModal} 
+                                    locationName={`${profile?.name} - ${sub.name}`}
+                                    theme={getRequestTheme(req.status)}
+                                    statusLabel={getStatusLabel(req.status)}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {subsWithRequests.map((sub, idx) => {
+                    const profile = profiles.find(p => p.id === sub.profileId);
+                    
+                    // Group requests of this sub by status
+                    const groupedByStatus = sub.requests.reduce((acc, req) => {
+                      if (!acc[req.status]) {
+                        acc[req.status] = [];
+                      }
+                      acc[req.status].push(req);
+                      return acc;
+                    }, {} as Record<RequestStatus, MaterialRequest[]>);
+                    
+                    // Sort status keys dynamically using STATUS_ORDER
+                    const sortedStatusEntries = Object.entries(groupedByStatus).sort((a, b) => {
+                      return (STATUS_ORDER[a[0] as RequestStatus] || 99) - (STATUS_ORDER[b[0] as RequestStatus] || 99);
+                    });
 
+                    return (
+                      <motion.div
+                        key={sub.id}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-xl backdrop-blur-md flex flex-col hover:border-white/20 hover:shadow-2xl transition-all"
+                      >
+                        {/* Header: Photo and Name */}
+                        <div className="flex items-center gap-4 border-b border-white/10 pb-4 mb-4">
+                          {profile?.avatarUrl ? (
+                            <img 
+                              src={profile.avatarUrl} 
+                              alt={profile.name || "User"} 
+                              referrerPolicy="no-referrer"
+                              className="w-14 h-14 rounded-2xl object-cover border border-white/15 shadow-md shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/15 shadow-md flex items-center justify-center text-white font-black text-lg shrink-0">
+                              {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-black text-white truncate leading-none mb-1 shadow-sm">
+                              {profile?.name || "Nama PM"}
+                            </h4>
+                            <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-2 truncate">
+                              {sub.name}
+                            </p>
+                            <span className="inline-block px-2.5 py-0.5 bg-white/5 border border-white/10 rounded-lg text-[9px] font-black text-white/70 uppercase tracking-wider">
+                              Project Manager (PM)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Status List with Progress & Percentages */}
+                        <div className="flex-1 space-y-3">
+                          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] px-0.5 mb-1">Status Prosedur</p>
+                          {sortedStatusEntries.map(([status, itemReqs]) => {
+                            const percentage = Math.round((itemReqs.length / sub.requests.length) * 100);
+                            const hexColor = getStatusHexColor(status);
+                            return (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => setSelectedStatusDetail({ subId: sub.id, status: status as RequestStatus })}
+                                className="w-full flex flex-col p-3 bg-white/[0.02] hover:bg-white/10 border border-white/5 rounded-2xl transition-all text-left group"
+                              >
+                                <div className="flex items-center justify-between text-[11px] font-black text-white px-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span 
+                                      className="w-2.5 h-2.5 rounded-full transition-all group-hover:scale-110 shadow-md" 
+                                      style={{ backgroundColor: hexColor, boxShadow: `0 0 8px ${hexColor}` }} 
+                                    />
+                                    <span className="capitalize">{getStatusLabel(status)}</span>
+                                  </div>
+                                  <span className="text-white/40 group-hover:text-white transition-all">
+                                    {itemReqs.length} Item ({percentage}%)
+                                  </span>
+                                </div>
+                                
+                                {/* Progress Bar */}
+                                <div className="w-full h-1.5 bg-white/5 rounded-full mt-2.5 overflow-hidden">
+                                  <div 
+                                    className="h-full rounded-full transition-all duration-500" 
+                                    style={{ 
+                                      width: `${percentage}%`,
+                                      backgroundColor: hexColor 
+                                    }}
+                                  />
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+ 
               {orphanedRequests.length > 0 && (
                 <div className="pt-10 border-t border-border-ig">
                   <h3 className="text-xs font-bold text-ig-grey uppercase tracking-widest mb-6 px-2 text-red-500">Vektor Tak Terpeta (Lokasi Terhapus)</h3>
                   <div className="space-y-4">
-                    {orphanedRequests.map(req => (
-                      <RequestItem 
-                        key={req.id}
-                        request={req} 
-                        onStatusUpdate={updateRequestStatus} 
-                        onApproveEdit={approveEdit}
-                        onRejectEdit={rejectEdit}
-                        onRequestPayment={setShowPaymentModal}
-                        onDelete={(id) => {
-                          if (confirm('Hapus permintaan yang tidak memiliki lokasi ini?')) {
-                            deleteRequest(id);
-                          }
-                        }}
-                        locationName="Domain Kosong"
-                        theme={getRequestTheme(req.status)}
-                        statusLabel={getStatusLabel(req.status)}
-                      />
-                    ))}
+                    {orphanedRequests.map(req => {
+                      const isChecked = selectedItemIds.includes(req.id);
+                      return (
+                        <div key={req.id} className="flex items-center gap-3 w-full">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isChecked) {
+                                setSelectedItemIds(prev => prev.filter(id => id !== req.id));
+                              } else {
+                                setSelectedItemIds(prev => [...prev, req.id]);
+                              }
+                            }}
+                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                              isChecked 
+                                ? 'bg-white border-white text-black shadow-lg shadow-white/20 scale-105' 
+                                : 'border-white/20 bg-white/5 hover:border-white/45'
+                            }`}
+                            title="Pilih Item"
+                          >
+                            {isChecked && <Check size={14} strokeWidth={4} />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <RequestItem 
+                              key={req.id}
+                              request={req} 
+                              onStatusUpdate={updateRequestStatus} 
+                              onApproveEdit={approveEdit}
+                              onRejectEdit={rejectEdit}
+                              onRequestPayment={setShowPaymentModal}
+                              onDelete={(id) => {
+                                if (confirm('Hapus permintaan yang tidak memiliki lokasi ini?')) {
+                                  deleteRequest(id);
+                                }
+                              }}
+                              locationName="Domain Kosong"
+                              theme={getRequestTheme(req.status)}
+                              statusLabel={getStatusLabel(req.status)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -486,6 +730,78 @@ export default function SCMDashboard() {
       </div>
 
       <AnimatePresence>
+        {showFloatingActionBoard && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-sm bg-neutral-900 border border-white/10 rounded-2xl px-5 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] flex items-center justify-between gap-4"
+          >
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1">
+                {selectedRequests.length} Item Terpilih
+              </span>
+              <span className="text-xs font-black text-white italic capitalize">
+                {getStatusLabel(commonStatus || '')}
+              </span>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedItemIds([])}
+                className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-black text-[10px] transition-all active:scale-95 border border-white/5 uppercase tracking-wide"
+              >
+                Batal
+              </button>
+
+              {commonStatus === 'pending' && (
+                <button
+                  type="button"
+                  onClick={handleBulkProcess}
+                  className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-400 text-black px-3.5 py-2 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-yellow-500/10 uppercase tracking-wider"
+                >
+                  <Play size={12} fill="currentColor" />
+                  <span>Proses</span>
+                </button>
+              )}
+
+              {commonStatus === 'processing' && (
+                <button
+                  type="button"
+                  onClick={() => setShowBulkPaymentModal(selectedRequests)}
+                  className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-400 text-white px-3.5 py-2 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-orange-500/10 uppercase tracking-wider"
+                >
+                  <Send size={12} />
+                  <span>Ajukan Bayar</span>
+                </button>
+              )}
+
+              {commonStatus === 'awaiting_payment' && (
+                <button
+                  type="button"
+                  onClick={handleBulkApprovePayment}
+                  className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-400 text-white px-3.5 py-2 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-purple-500/10 uppercase tracking-wider"
+                >
+                  <CheckCircle2 size={12} />
+                  <span>Approve Bayar</span>
+                </button>
+              )}
+
+              {commonStatus === 'paid' && (
+                <button
+                  type="button"
+                  onClick={handleBulkShip}
+                  className="flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-400 text-white px-3.5 py-2 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-indigo-500/10 uppercase tracking-wider"
+                >
+                  <Truck size={12} />
+                  <span>Kirim Barang</span>
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {showMainMaterialModal && (
           <MainMaterialModal 
             materials={mainMaterials}
@@ -503,8 +819,127 @@ export default function SCMDashboard() {
               updateRequestStatus(requestId, 'awaiting_payment');
               setShowPaymentModal(null);
             }}
+            onSkip={(requestId) => {
+              updateRequestStatus(requestId, 'paid');
+              setShowPaymentModal(null);
+            }}
           />
         )}
+        {showBulkPaymentModal && (
+          <BulkPaymentModal 
+            requests={showBulkPaymentModal}
+            subs={subs}
+            profiles={profiles}
+            onClose={() => setShowBulkPaymentModal(null)}
+            onConfirm={(ids) => {
+              ids.forEach(id => updateRequestStatus(id, 'awaiting_payment'));
+              setShowBulkPaymentModal(null);
+              setSelectedItemIds([]);
+            }}
+            onSkip={(ids) => {
+              ids.forEach(id => updateRequestStatus(id, 'paid'));
+              setShowBulkPaymentModal(null);
+              setSelectedItemIds([]);
+            }}
+          />
+        )}
+
+        {selectedStatusDetail && (() => {
+          const sub = subs.find(s => s.id === selectedStatusDetail.subId);
+          const profile = profiles.find(p => p.id === sub?.profileId);
+          const status = selectedStatusDetail.status;
+          
+          const title = profile && sub ? `${profile.name} - ${sub.name}` : "Lokasi";
+          
+          // Filter requests matching this sub and status
+          const filteredReqs = requests.filter(r => r.subId === selectedStatusDetail.subId && r.status === status);
+          const hexColor = getStatusHexColor(status);
+          const theme = getRequestTheme(status);
+
+          return (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
+              <motion.div
+                key="status-popup"
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-zinc-950 border border-white/10 w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-[75vh]"
+              >
+                {/* Header of detailed popup */}
+                <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/[0.02]">
+                  <div>
+                    <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Daftar Permintaan</h3>
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: hexColor, boxShadow: `0 0 10px ${hexColor}80` }} />
+                      <h2 className="text-base font-black text-white tracking-tight leading-none uppercase">
+                        {getStatusLabel(status)} ({filteredReqs.length})
+                      </h2>
+                    </div>
+                    <p className="text-[11px] font-bold text-white/60 uppercase tracking-[0.05em] mt-2">
+                      Lokasi: {title}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedStatusDetail(null)} 
+                    className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-all hover:bg-white/10 shadow-lg"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Filtered items list */}
+                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-4">
+                  {filteredReqs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center p-12 opacity-30 h-full">
+                      <Package size={48} strokeWidth={1} className="text-white" />
+                      <p className="mt-4 text-xs font-black uppercase tracking-widest text-white">Tidak ada material berstatus ini</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredReqs.map((req) => {
+                        const isChecked = selectedItemIds.includes(req.id);
+                        return (
+                          <div key={req.id} className="flex items-center gap-3 w-full">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isChecked) {
+                                  setSelectedItemIds(prev => prev.filter(id => id !== req.id));
+                                } else {
+                                  setSelectedItemIds(prev => [...prev, req.id]);
+                                }
+                              }}
+                              className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                                isChecked 
+                                  ? 'bg-white border-white text-black shadow-lg shadow-white/20 scale-105' 
+                                  : 'border-white/20 bg-white/5 hover:border-white/45'
+                              }`}
+                              title="Pilih Item"
+                            >
+                              {isChecked && <Check size={14} strokeWidth={4} />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <RequestItem 
+                                request={req} 
+                                onStatusUpdate={updateRequestStatus} 
+                                onApproveEdit={approveEdit} 
+                                onRejectEdit={rejectEdit} 
+                                onRequestPayment={setShowPaymentModal} 
+                                locationName={title}
+                                theme={theme}
+                                statusLabel={getStatusLabel(req.status)}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );
@@ -800,11 +1235,12 @@ const RequestItem: React.FC<{
   );
 };
 
-function PaymentModal({ request, locationName, onClose, onConfirm }: { 
+function PaymentModal({ request, locationName, onClose, onConfirm, onSkip }: { 
   request: MaterialRequest; 
   locationName: string;
   onClose: () => void; 
   onConfirm: (id: string) => void;
+  onSkip: (id: string) => void;
 }) {
 
   const [form, setForm] = useState({
@@ -891,13 +1327,22 @@ function PaymentModal({ request, locationName, onClose, onConfirm }: {
             </div>
           </div>
 
-          <button 
-            type="submit"
-            className="w-full mt-6 bg-[#25D366] text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest"
-          >
-            <Send size={18} fill="currentColor" />
-            Kirim WhatsApp
-          </button>
+          <div className="flex flex-col gap-2 pt-2">
+            <button 
+              type="submit"
+              className="w-full bg-[#25D366] text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest"
+            >
+              <Send size={18} fill="currentColor" />
+              Kirim WhatsApp
+            </button>
+            <button 
+              type="button"
+              onClick={() => onSkip(request.id)}
+              className="w-full bg-white/5 border border-white/10 hover:bg-white/15 text-white py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all active:scale-95 uppercase tracking-widest"
+            >
+              Skip WA (Langsung Berhasil)
+            </button>
+          </div>
         </form>
       </motion.div>
     </div>
@@ -946,5 +1391,165 @@ function ActionButton({ label, icon, onClick, className }: { label: string, icon
       {icon}
       {label}
     </button>
+  );
+}
+
+function BulkPaymentModal({ 
+  requests, 
+  subs, 
+  profiles, 
+  onClose, 
+  onConfirm,
+  onSkip
+}: { 
+  requests: MaterialRequest[]; 
+  subs: any[];
+  profiles: any[];
+  onClose: () => void; 
+  onConfirm: (ids: string[]) => void;
+  onSkip: (ids: string[]) => void;
+}) {
+
+  const [form, setForm] = useState({
+    accountName: '',
+    accountNumber: '',
+    bank: ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // 1. Get unique location names
+    const uniqueLocations = Array.from(new Set(requests.map(r => {
+      const s = subs.find(sub => sub.id === r.subId);
+      const p = profiles.find(profile => profile.id === s?.profileId);
+      return p && s ? `${p.name} - ${s.name}` : '';
+    }).filter(Boolean)));
+    const locationText = uniqueLocations.join(', ');
+
+    // 2. Generate items text list without name & location in each item
+    const itemsText = requests.map((req, idx) => {
+      return `${idx + 1}. ${req.materialName} (${req.quantity} ${req.unit})`;
+    }).join('\n');
+
+    // 3. Format message exactly as the user specified:
+    // Lokasi : Pak Budiman (PM Wilayah Barat) - Cluster Anggrek - Blok A
+    // Atas Nama Rekening : Kiku
+    // No. Rekening : 230230
+    // Bank : Bca
+    // 
+    // Bismillah Saya Telah Mengorder:
+    // 1. Semen (Holcim) (50 sak)
+    // 2. Besi Beton 12mm (120 batang)
+    // 
+    // Mohon Lakukan Pembayaran Bu Terima Kasih
+    const message = `Lokasi : ${locationText}
+Atas Nama Rekening : ${form.accountName}
+No. Rekening : ${form.accountNumber}
+Bank : ${form.bank}
+
+Bismillah Saya Telah Mengorder:
+${itemsText}
+
+Mohon Lakukan Pembayaran Bu Terima Kasih`;
+
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+    onConfirm(requests.map(r => r.id));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ y: 50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 50, opacity: 0 }}
+        className="bg-zinc-900 w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/10"
+      >
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h3 className="text-xl font-black text-white tracking-tight uppercase">Bulk Payment</h3>
+            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-1">Konfirmasi Pembayaran Kolektif</p>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white border border-white/10 shadow-lg">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-[8px] font-black text-white/50 uppercase tracking-widest ml-1">Lokasi Gabungan</label>
+            <div className="max-h-20 overflow-y-auto w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-white/70">
+              {requests.map((r, idx) => {
+                const s = subs.find(sub => sub.id === r.subId);
+                const p = profiles.find(profile => profile.id === s?.profileId);
+                return (
+                  <div key={idx} className="truncate">
+                    • {p?.name} - {s?.name}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Atas Nama Rekening</label>
+            <input 
+              required
+              type="text" 
+              placeholder="..."
+              className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
+              onKeyDown={handleEnterNextField}
+              onBlur={e => setForm({...form, accountName: toTitleCase(e.target.value)})}
+              value={form.accountName}
+              onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, accountName: val}))}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">No. Rekening</label>
+              <input 
+                required
+                type="text" 
+                placeholder="000"
+                className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
+                onKeyDown={handleEnterNextField}
+                value={form.accountNumber}
+                onChange={e => setForm({...form, accountNumber: e.target.value})}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Bank</label>
+              <input 
+                required
+                type="text" 
+                placeholder="BCA/BRI"
+                className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
+                onKeyDown={handleEnterNextField}
+                onBlur={e => setForm({...form, bank: toTitleCase(e.target.value)})}
+                value={form.bank}
+                onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, bank: val}))}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <button 
+              type="submit"
+              className="w-full bg-[#25D366] text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest"
+            >
+              <Send size={18} fill="currentColor" />
+              Kirim WhatsApp
+            </button>
+            <button 
+              type="button"
+              onClick={() => onSkip(requests.map(r => r.id))}
+              className="w-full bg-white/5 border border-white/10 hover:bg-white/15 text-white py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all active:scale-95 uppercase tracking-widest"
+            >
+              Skip WA (Langsung Berhasil)
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
   );
 }
