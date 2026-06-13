@@ -1288,21 +1288,19 @@ Mohon Di proses`;
                           SIMPAN PERUBAHAN
                         </button>
 
-                        {(parseFloat(editQuantity) === 0 || selectedStock.quantity === 0) && (
-                          <button 
-                            onClick={() => {
-                              if (confirm(`Yakin ingin menghapus stok ${selectedStock.materialName} karena sudah kosong?`)) {
-                                if (activeSubId && selectedStock) {
-                                  deleteStock(activeSubId, selectedStock.id);
-                                  setSelectedStock(null);
-                                }
+                        <button 
+                          onClick={() => {
+                            if (confirm(`Yakin ingin menghapus stok ${selectedStock.materialName}? Tindakan ini akan menghapus stok dari web secara permanen.`)) {
+                              if (activeSubId && selectedStock) {
+                                deleteStock(activeSubId, selectedStock.id);
+                                setSelectedStock(null);
                               }
-                            }}
-                            className="w-full bg-red-500/15 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white py-4 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 shadow-lg shadow-red-500/10"
-                          >
-                            <Trash2 size={14} /> HAPUS STOK
-                          </button>
-                        )}
+                            }
+                          }}
+                          className="w-full bg-red-500/15 border border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white py-4 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 shadow-lg shadow-red-500/10"
+                        >
+                          <Trash2 size={14} /> HAPUS STOK
+                        </button>
                       </div>
                     </div>
                   </div>

@@ -456,8 +456,8 @@ export default function SCMDashboard() {
                     }, {} as Record<RequestStatus, MaterialRequest[]>);
                     
                     // Sort status keys dynamically using STATUS_ORDER
-                    const sortedStatusEntries = Object.entries(groupedByStatus).sort((a, b) => {
-                      return (STATUS_ORDER[a[0] as RequestStatus] || 99) - (STATUS_ORDER[b[0] as RequestStatus] || 99);
+                    const sortedStatusEntries = (Object.entries(groupedByStatus) as [RequestStatus, MaterialRequest[]][]).sort((a, b) => {
+                      return (STATUS_ORDER[a[0]] || 99) - (STATUS_ORDER[b[0]] || 99);
                     });
 
                     return (
