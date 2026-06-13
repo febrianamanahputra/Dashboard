@@ -463,7 +463,7 @@ Mohon Di proses`;
       <RAPDashboard 
         onBack={() => setView('main')} 
         subId={activeSubId || ''}
-        stock={[]} // Simplified for now
+        stock={subStock} // Passing the live stock from Firestore
       />
     );
   }
@@ -811,7 +811,8 @@ Mohon Di proses`;
                           </>
                         )}
                         {activeTab === 'stok' && (() => {
-                          const sortedStock = [...subStock]
+                          const activeStockList = subStock.filter(entry => entry.quantity > 0);
+                          const sortedStock = [...activeStockList]
                             .filter(entry => entry.materialName.toLowerCase().includes(stockSearchQuery.toLowerCase()))
                             .sort((a, b) => a.materialName.localeCompare(b.materialName, 'id', { sensitivity: 'base' }));
 
@@ -857,7 +858,7 @@ Mohon Di proses`;
                           return (
                             <>
                               <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Gudang Mini ({subStock.length})</h3>
+                                <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Gudang Mini ({activeStockList.length})</h3>
                                 <div className="flex gap-2">
                                   <button 
                                     onClick={handleSendStockWA}
@@ -894,7 +895,7 @@ Mohon Di proses`;
                                 )}
                               </div>
 
-                              {subStock.length === 0 ? (
+                              {activeStockList.length === 0 ? (
                                 <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
                                    <Box size={32} className="mb-2" />
                                    <p className="text-xs font-bold uppercase tracking-widest">Stok kosong</p>
