@@ -314,13 +314,15 @@ export default function SMDashboard() {
     const locationName = activeSub ? activeSub.name : 'Project';
     const dateStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
     
-    let message = `*Stock Material ${locationName}*\n\`${dateStr}\`\n________________________________________\n\n`;
+    let message = `*Stock Material ${locationName.trim()}*\n\`${dateStr}\`\n________________________________________\n\n`;
     
-    if (subStock.length === 0) {
+    const availableStock = subStock.filter(item => item.quantity > 0);
+    
+    if (availableStock.length === 0) {
       message += "_Stok Kosong_";
     } else {
-      subStock.sort((a,b) => a.materialName.localeCompare(b.materialName)).forEach(item => {
-        message += `> *${item.materialName}* ${item.quantity} ${item.unit}\n`;
+      availableStock.sort((a,b) => a.materialName.localeCompare(b.materialName, 'id', { sensitivity: 'base' })).forEach(item => {
+        message += `> *${item.materialName.trim()}* : ${item.quantity} ${item.unit}\n`;
       });
     }
     
