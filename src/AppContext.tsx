@@ -509,20 +509,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       if (newStatus === 'received' && currentReq.status !== 'received') {
-        const q = query(
-          collection(db, `subs/${currentReq.subId}/stock`), 
-          where('materialName', '==', currentReq.materialName)
-        );
-        const stockSnapshot = await getDocs(q);
-        if (!stockSnapshot.empty) {
-          const sDoc = stockSnapshot.docs[0];
-          await updateDoc(sDoc.ref, {
-            quantity: (sDoc.data().quantity || 0) + currentReq.quantity,
+        const stockRef = collection(db, `subs/${currentReq.subId}/stock`);
+        const stockSnapshot = await getDocs(stockRef);
+        
+        let matchingDoc = null;
+        const targetName = (currentReq.materialName || '').trim().toLowerCase();
+        
+        for (const docSnapshot of stockSnapshot.docs) {
+          const name = (docSnapshot.data().materialName || '').trim().toLowerCase();
+          if (name === targetName) {
+            matchingDoc = docSnapshot;
+            break;
+          }
+        }
+
+        if (matchingDoc) {
+          await updateDoc(matchingDoc.ref, {
+            quantity: (matchingDoc.data().quantity || 0) + currentReq.quantity,
             dateReceived: Date.now()
           });
         } else {
-          await addDoc(collection(db, `subs/${currentReq.subId}/stock`), {
-            materialName: currentReq.materialName,
+          await addDoc(stockRef, {
+            materialName: currentReq.materialName.trim(),
             quantity: currentReq.quantity,
             unit: currentReq.unit,
             dateReceived: Date.now(),
@@ -581,20 +589,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addManualStock = async (subId: string, materialName: string, quantity: number, unit: string) => {
     try {
-      const q = query(
-        collection(db, `subs/${subId}/stock`), 
-        where('materialName', '==', materialName)
-      );
-      const stockSnapshot = await getDocs(q);
-      if (!stockSnapshot.empty) {
-        const sDoc = stockSnapshot.docs[0];
-        await updateDoc(sDoc.ref, {
-          quantity: (sDoc.data().quantity || 0) + quantity,
+      const stockRef = collection(db, `subs/${subId}/stock`);
+      const stockSnapshot = await getDocs(stockRef);
+      
+      let matchingDoc = null;
+      const targetName = (materialName || '').trim().toLowerCase();
+      
+      for (const docSnapshot of stockSnapshot.docs) {
+        const name = (docSnapshot.data().materialName || '').trim().toLowerCase();
+        if (name === targetName) {
+          matchingDoc = docSnapshot;
+          break;
+        }
+      }
+
+      if (matchingDoc) {
+        await updateDoc(matchingDoc.ref, {
+          quantity: (matchingDoc.data().quantity || 0) + quantity,
           dateReceived: Date.now()
         });
       } else {
-        await addDoc(collection(db, `subs/${subId}/stock`), {
-          materialName,
+        await addDoc(stockRef, {
+          materialName: materialName.trim(),
           quantity,
           unit,
           dateReceived: Date.now(),
