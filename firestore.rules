@@ -147,12 +147,14 @@ service cloud.firestore {
 
       match /stock/{stockId} {
         allow read: if isSignedIn();
-        allow write: if isSignedIn() && isValidStock(incoming()) && isValidId(stockId);
+        allow create, update: if isSignedIn() && isValidStock(incoming()) && isValidId(stockId);
+        allow delete: if isSignedIn();
       }
 
       match /rapData/{itemId} {
         allow read: if isSignedIn();
-        allow write: if isSignedIn() && isValidRAPItem(incoming()) && isValidId(itemId);
+        allow create, update: if isSignedIn() && isValidRAPItem(incoming()) && isValidId(itemId);
+        allow delete: if isSignedIn();
       }
     }
 
