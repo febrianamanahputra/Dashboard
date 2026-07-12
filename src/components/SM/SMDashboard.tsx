@@ -125,8 +125,10 @@ export default function SMDashboard() {
     removeSub,
     updateRequestStatus, 
     updateStock,
+    addStockQuantity,
     deleteStock,
     addManualStock,
+    updateStockLimit,
     mainMaterials = []
   } = useApp();
   
@@ -141,6 +143,8 @@ export default function SMDashboard() {
   const [showEditSub, setShowEditSub] = useState<string | null>(null);
   const [subToDelete, setSubToDelete] = useState<any>(null);
   const [selectedStock, setSelectedStock] = useState<StockEntry | null>(null);
+  const [addingStockItem, setAddingStockItem] = useState<StockEntry | null>(null);
+  const [addStockAmount, setAddStockAmount] = useState<string>('');
   const [selectedRequestForDetail, setSelectedRequestForDetail] = useState<MaterialRequest | null>(null);
   const [editQuantity, setEditQuantity] = useState<string>('');
   const [editUnit, setEditUnit] = useState<string>('');
@@ -152,6 +156,8 @@ export default function SMDashboard() {
   const [subStock, setSubStock] = useState<StockEntry[]>([]);
   const [receivingRequest, setReceivingRequest] = useState<MaterialRequest | null>(null);
   const [showAddManualStock, setShowAddManualStock] = useState(false);
+  const [editingLimitId, setEditingLimitId] = useState<string | null>(null);
+  const [tempLimitValue, setTempLimitValue] = useState<string>('');
   const [showAdd, setShowAdd] = useState(false);
   const [viewingNota, setViewingNota] = useState<any>(null);
   const [activeView, setActiveView] = useState<'reports' | 'requests' | 'funds' | 'profile'>('requests');
@@ -194,7 +200,7 @@ export default function SMDashboard() {
   // Back Button Navigation Support for Android/Mobile Browser
   React.useEffect(() => {
     const hasOpenModal = !!(
-      showAddForm || editingRequest || showMainRequestForm || selectedStock || 
+      showAddForm || editingRequest || showMainRequestForm || selectedStock || addingStockItem ||
       selectedRequestForDetail || receivingRequest || showAdd || viewingNota ||
       showAddProfile || showAddSub || showEditProfile || showEditSub || showAddManualStock
     );
@@ -211,6 +217,7 @@ export default function SMDashboard() {
         setEditingRequest(null);
         setShowMainRequestForm(false);
         setSelectedStock(null);
+        setAddingStockItem(null);
         setSelectedRequestForDetail(null);
         setReceivingRequest(null);
         setShowAdd(false);
@@ -239,7 +246,7 @@ export default function SMDashboard() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [
-    showAddForm, editingRequest, showMainRequestForm, selectedStock, 
+    showAddForm, editingRequest, showMainRequestForm, selectedStock, addingStockItem,
     selectedRequestForDetail, receivingRequest, showAdd, viewingNota,
     showAddProfile, showAddSub, showEditProfile, showEditSub, 
     activeView, activeProfileId, activeSubId, view
@@ -789,29 +796,177 @@ Mohon Di proses`;
                             )}
                           </>
                         )}
-                        {activeTab === 'total' && (
-                          <>
-                            <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Total Akumulasi Material</h3>
-                            <div className="ig-card divide-y divide-gray-50 border-t-2 border-ig-black overflow-hidden">
-                               {totalsArray.length === 0 ? (
-                                 <p className="p-8 text-center text-xs text-ig-grey font-bold">Belum ada data tersedia</p>
-                               ) : (
-                                 totalsArray.map((item, idx) => (
-                                   <div key={idx} className="p-4 flex items-center justify-between bg-white/10 backdrop-blur-sm border-b border-white/5">
-                                      <div>
-                                        <p className="text-sm font-bold tracking-tight text-white">{item.materialName}</p>
-                                        <p className="text-[10px] text-white/50 font-bold uppercase tracking-tighter mt-0.5">Sudah Diterima</p>
+                        {activeTab === 'total' && (() => {
+                          const filteredTotalStock = subStock
+                            .filter(entry => entry.materialName.toLowerCase().includes(stockSearchQuery.toLowerCase()))
+                            .sort((a, b) => a.materialName.localeCompare(b.materialName, 'id', { sensitivity: 'base' }));
+
+                          return (
+                            <>
+                              <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-[10px] font-bold text-ig-grey uppercase tracking-widest px-1">Total Tracking Material ({filteredTotalStock.length})</h3>
+                              </div>
+
+                              <div className="relative mb-3">
+                                <input 
+                                  type="text" 
+                                  placeholder="Cari material..." 
+                                  value={stockSearchQuery}
+                                  onChange={(e) => setStockSearchQuery(e.target.value)}
+                                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-white outline-none focus:bg-white/10 focus:border-white/20 transition-all placeholder:text-white/30"
+                                />
+                                <Search size={14} className="absolute left-3.5 top-3.5 text-white/30" />
+                                {stockSearchQuery && (
+                                  <button 
+                                    onClick={() => setStockSearchQuery('')}
+                                    className="absolute right-3.5 top-3.5 text-white/40 hover:text-white"
+                                    type="button"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+
+                              {subStock.length === 0 ? (
+                                <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
+                                   <Box size={32} className="mb-2" />
+                                   <p className="text-xs font-bold uppercase tracking-widest">Belum ada material terdaftar</p>
+                                </div>
+                              ) : filteredTotalStock.length === 0 ? (
+                                <div className="ig-card p-12 flex flex-col items-center justify-center text-center opacity-40">
+                                   <Box size={32} className="mb-2" />
+                                   <p className="text-xs font-bold uppercase tracking-widest">Tidak ada material cocok</p>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col gap-3 mt-2">
+                                  {filteredTotalStock.map((item) => {
+                                    const onsiteVal = item.onsite ?? item.quantity ?? 0;
+                                    const isLow = (item.limit ?? 0) > 0 && onsiteVal >= (item.limit ?? 0);
+                                    
+                                    return (
+                                      <div 
+                                        key={item.id} 
+                                        className={`bg-white/10 backdrop-blur-md p-4 rounded-3xl border transition-all ${
+                                          isLow 
+                                            ? 'border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)] bg-red-500/5' 
+                                            : 'border-white/10 hover:border-white/20'
+                                        }`}
+                                      >
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                          {/* Material Info */}
+                                          <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${
+                                              isLow ? 'bg-red-500/20 border-red-500/30 text-red-400' : 'bg-white/5 border-white/10 text-white/60'
+                                            }`}>
+                                              <Box size={16} className={isLow ? 'animate-bounce' : ''} />
+                                            </div>
+                                            <div>
+                                              <div className="flex items-center gap-2">
+                                                <p className="font-black text-sm tracking-tight text-white capitalize">{item.materialName}</p>
+                                                {isLow && (
+                                                  <span className="px-2 py-0.5 rounded-full bg-red-500 text-[8px] font-black uppercase tracking-wider text-white animate-pulse">
+                                                    Limit Tercapai
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-0.5">
+                                                SATUAN: <span className="text-white/60">{item.unit}</span>
+                                              </p>
+                                            </div>
+                                          </div>
+
+                                          {/* Indicators row */}
+                                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                            {/* Stock (Green) */}
+                                            <div className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/20 px-3 py-1.5 rounded-2xl select-none" title="Stok Saat Ini (Tersedia)">
+                                              <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
+                                              <span className="text-xs font-black text-green-400">Stock: {item.quantity}</span>
+                                            </div>
+
+                                            {/* Onsite (Blue) */}
+                                            <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-2xl select-none" title="Total Akumulasi Material Diterima">
+                                              <span className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.5)]" />
+                                              <span className="text-xs font-black text-blue-400">Onsite: {onsiteVal}</span>
+                                            </div>
+
+                                            {/* Limit (Red) with plus/minus and click-to-input triggers */}
+                                            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-2xl" title="Klik untuk edit batas limit secara manual">
+                                              <span className="w-2 h-2 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
+                                              {editingLimitId === item.id ? (
+                                                <input
+                                                  type="number"
+                                                  className="w-12 bg-white/20 text-white font-black text-xs px-1.5 py-0.5 rounded border border-white/20 focus:outline-none focus:ring-1 focus:ring-red-400 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                  value={tempLimitValue}
+                                                  onChange={(e) => setTempLimitValue(e.target.value)}
+                                                  onBlur={() => {
+                                                    const newVal = parseFloat(tempLimitValue);
+                                                    if (!isNaN(newVal) && newVal >= 0) {
+                                                      updateStockLimit(activeSubId || '', item.id, newVal);
+                                                    }
+                                                    setEditingLimitId(null);
+                                                  }}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                      const newVal = parseFloat(tempLimitValue);
+                                                      if (!isNaN(newVal) && newVal >= 0) {
+                                                        updateStockLimit(activeSubId || '', item.id, newVal);
+                                                      }
+                                                      setEditingLimitId(null);
+                                                    } else if (e.key === 'Escape') {
+                                                      setEditingLimitId(null);
+                                                    }
+                                                  }}
+                                                  autoFocus
+                                                  onClick={(e) => e.stopPropagation()}
+                                                />
+                                              ) : (
+                                                <span 
+                                                  onClick={() => {
+                                                    setEditingLimitId(item.id);
+                                                    setTempLimitValue((item.limit ?? 0).toString());
+                                                  }}
+                                                  className="text-xs font-black text-red-400 cursor-pointer hover:bg-red-500/10 px-1 rounded transition-colors"
+                                                  title="Klik untuk mengisi limit"
+                                                >
+                                                  Limit: {item.limit ?? 0}
+                                                </span>
+                                              )}
+                                              
+                                              <div className="flex items-center gap-1 border-l border-red-500/20 pl-2 ml-1">
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateStockLimit(activeSubId || '', item.id, Math.max(0, (item.limit ?? 0) - 1));
+                                                  }}
+                                                  className="w-5 h-5 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/40 text-xs font-black transition-all active:scale-75 select-none"
+                                                  title="Kurangi Batas Limit"
+                                                >
+                                                  -
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateStockLimit(activeSubId || '', item.id, (item.limit ?? 0) + 1);
+                                                  }}
+                                                  className="w-5 h-5 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/40 text-xs font-black transition-all active:scale-75 select-none"
+                                                  title="Tambah Batas Limit"
+                                                >
+                                                  +
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
                                       </div>
-                                      <div className="text-right">
-                                        <p className="text-xl font-black italic tracking-tighter leading-none text-white">{item.quantity}</p>
-                                        <span className="text-[10px] font-bold uppercase text-white/40">{item.unit}</span>
-                                      </div>
-                                   </div>
-                                 ))
-                               )}
-                            </div>
-                          </>
-                        )}
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                         {activeTab === 'stok' && (() => {
                           const activeStockList = subStock.filter(entry => entry.quantity > 0);
                           const sortedStock = [...activeStockList]
@@ -835,25 +990,52 @@ Mohon Di proses`;
                               );
                             }
                             renderedStockWithDividers.push(
-                              <motion.button 
+                              <motion.div 
                                 layout 
                                 key={entry.id} 
-                                onClick={() => { setSelectedStock(entry); setEditQuantity(entry.quantity.toString()); setEditUnit(entry.unit); }} 
-                                className="w-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-between p-4 rounded-2xl active:scale-[0.98] transition-all group hover:bg-white/20 shadow-xl"
+                                className="w-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-between p-4 rounded-3xl transition-all hover:bg-white/15 gap-3 shadow-xl"
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 text-white/40">
+                                  <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 text-white/40">
                                     <Box size={14} />
                                   </div>
                                   <div className="text-left text-white">
-                                    <p className="font-black text-xs tracking-tight">{entry.materialName}</p>
+                                    <p className="font-black text-xs tracking-tight capitalize">{entry.materialName}</p>
                                     <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">Update: {new Date(entry.dateReceived).toLocaleDateString('id-ID')}</p>
                                   </div>
                                 </div>
-                                <div className="text-right">
-                                  <p className="text-sm font-black italic text-white">{entry.quantity} <span className="text-[10px] text-white/40 uppercase font-black">{entry.unit}</span></p>
+                                <div className="flex items-center gap-4">
+                                  <div className="text-right">
+                                    <p className="text-sm font-black italic text-white">{entry.quantity} <span className="text-[10px] text-white/40 uppercase font-black">{entry.unit}</span></p>
+                                    {(entry.limit ?? 0) > 0 && (
+                                      <p className="text-[9px] font-bold text-red-400 mt-0.5">Limit: {entry.limit}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button 
+                                      onClick={() => {
+                                        setSelectedStock(entry);
+                                        setEditQuantity(entry.quantity.toString());
+                                        setEditUnit(entry.unit);
+                                      }}
+                                      className="px-3 py-2 bg-white/10 text-white hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95"
+                                      title="Edit atau hapus material"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button 
+                                      onClick={() => {
+                                        setAddingStockItem(entry);
+                                        setAddStockAmount('');
+                                      }}
+                                      className="px-3 py-2 bg-white text-black hover:bg-neutral-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center gap-1 shadow-md"
+                                      title="Tambah Stok"
+                                    >
+                                      <Plus size={10} className="stroke-[3]" /> Tambah
+                                    </button>
+                                  </div>
                                 </div>
-                              </motion.button>
+                              </motion.div>
                             );
                           });
 
@@ -1093,6 +1275,88 @@ Mohon Di proses`;
               setShowAddManualStock(false);
             }}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {addingStockItem && activeSubId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="w-full max-w-sm bg-neutral-900 border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden"
+            >
+              {/* Decorative top ambient bar */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500" />
+              
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 text-white/40">
+                  <Plus size={18} className="text-emerald-400 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Tambah Stok</h3>
+                  <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">{addingStockItem.materialName}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-3 flex justify-between items-center text-xs font-bold text-white/60">
+                  <span>Stok Saat Ini:</span>
+                  <span className="text-white font-black italic">{addingStockItem.quantity} {addingStockItem.unit}</span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-ig-grey uppercase tracking-widest ml-1">Jumlah Tambahan</label>
+                  <div className="relative">
+                    <input 
+                      type="number"
+                      autoFocus
+                      placeholder="0"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none transition-all"
+                      value={addStockAmount}
+                      onChange={(e) => setAddStockAmount(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && addStockAmount) {
+                          const amount = parseFloat(addStockAmount);
+                          if (amount > 0) {
+                            addStockQuantity(activeSubId, addingStockItem.id, amount, addingStockItem.unit);
+                            setAddingStockItem(null);
+                          }
+                        }
+                      }}
+                    />
+                    <span className="absolute right-4 top-3.5 text-xs font-black text-white/40 uppercase">{addingStockItem.unit}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2">
+                  <button 
+                    onClick={() => {
+                      const amount = parseFloat(addStockAmount);
+                      if (amount > 0) {
+                        addStockQuantity(activeSubId, addingStockItem.id, amount, addingStockItem.unit);
+                        setAddingStockItem(null);
+                      } else {
+                        alert('Silakan masukkan jumlah tambahan yang valid (lebih dari 0)');
+                      }
+                    }}
+                    className="w-full bg-white text-black py-4 rounded-2xl font-black text-xs shadow-lg active:scale-95 hover:bg-neutral-200 transition-all text-center uppercase tracking-widest"
+                  >
+                    TAMBAH KE GUDANG
+                  </button>
+
+                  <button 
+                    onClick={() => setAddingStockItem(null)}
+                    className="w-full py-3.5 text-[10px] font-bold text-ig-grey hover:text-white uppercase tracking-widest"
+                  >
+                    KEMBALI
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

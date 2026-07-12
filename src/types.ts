@@ -25,6 +25,8 @@ export interface StockEntry {
   locationName?: string;
   recipient?: string;
   deliverer?: string;
+  onsite?: number;
+  limit?: number;
 }
 
 export interface RAPItem {

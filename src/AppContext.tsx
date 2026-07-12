@@ -15,6 +15,7 @@ import {
   collectionGroup,
   where,
   getDocs,
+  getDoc,
   runTransaction
 } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from './lib/firestoreUtils';
@@ -52,8 +53,10 @@ interface AppContextType {
   markNotificationsAsRead: (role: 'SM' | 'SCM' | 'FINANCE' | 'RAP') => void;
   setRapData: (subId: string, data: RAPItem[]) => void;
   updateStock: (subId: string, stockId: string, newQuantity: number, newUnit?: string) => void;
+  addStockQuantity: (subId: string, stockId: string, addedQuantity: number, newUnit?: string) => void;
   deleteStock: (subId: string, stockId: string) => void;
   addManualStock: (subId: string, materialName: string, quantity: number, unit: string) => void;
+  updateStockLimit: (subId: string, stockId: string, newLimit: number) => void;
   addFieldFundEntry: (entry: Omit<FieldFundEntry, 'id' | 'createdAt'>) => void;
   deleteFieldFundEntry: (id: string) => void;
   addFieldFundDeposit: (deposit: Omit<FieldFundDeposit, 'id' | 'createdAt'>) => void;
@@ -524,17 +527,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         if (matchingDoc) {
+          const currentData = matchingDoc.data();
           await updateDoc(matchingDoc.ref, {
-            quantity: (matchingDoc.data().quantity || 0) + currentReq.quantity,
+            quantity: (currentData.quantity || 0) + currentReq.quantity,
+            onsite: (currentData.onsite || currentData.quantity || 0) + currentReq.quantity,
             dateReceived: Date.now()
           });
         } else {
           await addDoc(stockRef, {
             materialName: currentReq.materialName.trim(),
             quantity: currentReq.quantity,
+            onsite: currentReq.quantity,
             unit: currentReq.unit,
             dateReceived: Date.now(),
-            subId: currentReq.subId
+            subId: currentReq.subId,
+            limit: 0
           });
         }
       }
@@ -569,11 +576,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateStock = async (subId: string, stockId: string, newQuantity: number, newUnit?: string) => {
     try {
-      const updateData: { quantity: number; unit?: string } = { quantity: newQuantity };
-      if (newUnit !== undefined) {
-        updateData.unit = newUnit;
-      }
-      await updateDoc(doc(db, `subs/${subId}/stock`, stockId), updateData);
+      const stockDocRef = doc(db, `subs/${subId}/stock`, stockId);
+      await runTransaction(db, async (transaction) => {
+        const stockSnap = await transaction.get(stockDocRef);
+        if (!stockSnap.exists()) return;
+
+        const data = stockSnap.data();
+        const currentQty = data.quantity ?? 0;
+        const currentOnsite = data.onsite ?? currentQty;
+        const limit = data.limit ?? 0;
+        const materialName = data.materialName ?? 'Material';
+
+        // Delta calculation: Onsite only increases when quantity is increased
+        const diff = newQuantity - currentQty;
+        const newOnsite = diff > 0 ? currentOnsite + diff : currentOnsite;
+
+        const updateData: { quantity: number; onsite: number; unit?: string; dateReceived: number } = {
+          quantity: newQuantity,
+          onsite: newOnsite,
+          dateReceived: Date.now()
+        };
+        if (newUnit !== undefined) {
+          updateData.unit = newUnit;
+        }
+
+        transaction.update(stockDocRef, updateData);
+
+        if (limit > 0 && newOnsite >= limit) {
+          const subSnap = await transaction.get(doc(db, 'subs', subId));
+          const subName = subSnap.exists() ? subSnap.data().name : 'Sub';
+          addNotification(`Stok Onsite ${materialName} mencapai/melebihi limit (${newOnsite} >= ${limit}) di ${subName}`, 'SM', 'update', subName);
+        }
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `subs/${subId}/stock/${stockId}`);
+    }
+  };
+
+  const addStockQuantity = async (subId: string, stockId: string, addedQuantity: number, newUnit?: string) => {
+    try {
+      const stockDocRef = doc(db, `subs/${subId}/stock`, stockId);
+      await runTransaction(db, async (transaction) => {
+        const stockSnap = await transaction.get(stockDocRef);
+        if (!stockSnap.exists()) return;
+
+        const data = stockSnap.data();
+        const currentQty = data.quantity ?? 0;
+        const currentOnsite = data.onsite ?? currentQty;
+        const limit = data.limit ?? 0;
+        const materialName = data.materialName ?? 'Material';
+
+        const newQty = currentQty + addedQuantity;
+        const newOnsite = currentOnsite + addedQuantity;
+
+        const updateData: { quantity: number; onsite: number; unit?: string; dateReceived: number } = {
+          quantity: newQty,
+          onsite: newOnsite,
+          dateReceived: Date.now()
+        };
+        if (newUnit !== undefined) {
+          updateData.unit = newUnit;
+        }
+
+        transaction.update(stockDocRef, updateData);
+
+        if (limit > 0 && newOnsite >= limit) {
+          const subSnap = await transaction.get(doc(db, 'subs', subId));
+          const subName = subSnap.exists() ? subSnap.data().name : 'Sub';
+          addNotification(`Stok Onsite ${materialName} mencapai/melebihi limit (${newOnsite} >= ${limit}) di ${subName}`, 'SM', 'update', subName);
+        }
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `subs/${subId}/stock/${stockId}`);
     }
@@ -584,6 +656,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await deleteDoc(doc(db, `subs/${subId}/stock`, stockId));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `subs/${subId}/stock/${stockId}`);
+    }
+  };
+
+  const updateStockLimit = async (subId: string, stockId: string, newLimit: number) => {
+    try {
+      const stockDocRef = doc(db, `subs/${subId}/stock`, stockId);
+      await updateDoc(stockDocRef, { limit: newLimit });
+
+      const stockSnap = await getDoc(stockDocRef);
+      if (stockSnap.exists()) {
+        const data = stockSnap.data();
+        const quantity = data.quantity ?? 0;
+        const onsite = data.onsite ?? quantity;
+        const materialName = data.materialName ?? 'Material';
+        if (newLimit > 0 && onsite >= newLimit) {
+          const subSnap = await getDoc(doc(db, 'subs', subId));
+          const subName = subSnap.exists() ? subSnap.data().name : 'Sub';
+          addNotification(`Stok Onsite ${materialName} mencapai/melebihi limit (${onsite} >= ${newLimit}) di ${subName}`, 'SM', 'update', subName);
+        }
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `subs/${subId}/stock/${stockId}`);
     }
   };
 
@@ -604,17 +698,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (matchingDoc) {
+        const currentData = matchingDoc.data();
         await updateDoc(matchingDoc.ref, {
-          quantity: (matchingDoc.data().quantity || 0) + quantity,
+          quantity: (currentData.quantity || 0) + quantity,
+          onsite: (currentData.onsite || currentData.quantity || 0) + quantity,
           dateReceived: Date.now()
         });
       } else {
         await addDoc(stockRef, {
           materialName: materialName.trim(),
           quantity,
+          onsite: quantity,
           unit,
           dateReceived: Date.now(),
-          subId
+          subId,
+          limit: 0
         });
       }
     } catch (error) {
@@ -726,8 +824,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rapData,
       setRapData: updateRapData,
       updateStock,
+      addStockQuantity,
       deleteStock,
       addManualStock,
+      updateStockLimit,
       addFieldFundEntry,
       deleteFieldFundEntry,
       addFieldFundDeposit,
