@@ -889,73 +889,51 @@ Mohon Di proses`;
                                               <span className="text-xs font-black text-blue-400">Onsite: {onsiteVal}</span>
                                             </div>
 
-                                            {/* Limit (Red) with plus/minus and click-to-input triggers */}
-                                            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-2xl" title="Klik untuk edit batas limit secara manual">
+                                            {/* Limit (Red) with click-to-input trigger */}
+                                            <div 
+                                              onClick={() => {
+                                                setEditingLimitId(item.id);
+                                                setTempLimitValue((item.limit ?? 0).toString());
+                                              }}
+                                              className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-2xl cursor-pointer hover:bg-red-500/15 transition-all select-none"
+                                              title="Klik untuk mengisi limit"
+                                            >
                                               <span className="w-2 h-2 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
                                               {editingLimitId === item.id ? (
-                                                <input
-                                                  type="number"
-                                                  className="w-12 bg-white/20 text-white font-black text-xs px-1.5 py-0.5 rounded border border-white/20 focus:outline-none focus:ring-1 focus:ring-red-400 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                  value={tempLimitValue}
-                                                  onChange={(e) => setTempLimitValue(e.target.value)}
-                                                  onBlur={() => {
-                                                    const newVal = parseFloat(tempLimitValue);
-                                                    if (!isNaN(newVal) && newVal >= 0) {
-                                                      updateStockLimit(activeSubId || '', item.id, newVal);
-                                                    }
-                                                    setEditingLimitId(null);
-                                                  }}
-                                                  onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
+                                                <div className="flex items-center gap-1">
+                                                  <span className="text-xs font-black text-red-400">Limit:</span>
+                                                  <input
+                                                    type="number"
+                                                    className="w-10 bg-white/20 text-white font-black text-xs px-1 py-0.5 rounded border border-white/20 focus:outline-none focus:ring-1 focus:ring-red-400 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    value={tempLimitValue}
+                                                    onChange={(e) => setTempLimitValue(e.target.value)}
+                                                    onBlur={() => {
                                                       const newVal = parseFloat(tempLimitValue);
                                                       if (!isNaN(newVal) && newVal >= 0) {
                                                         updateStockLimit(activeSubId || '', item.id, newVal);
                                                       }
                                                       setEditingLimitId(null);
-                                                    } else if (e.key === 'Escape') {
-                                                      setEditingLimitId(null);
-                                                    }
-                                                  }}
-                                                  autoFocus
-                                                  onClick={(e) => e.stopPropagation()}
-                                                />
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                      if (e.key === 'Enter') {
+                                                        const newVal = parseFloat(tempLimitValue);
+                                                        if (!isNaN(newVal) && newVal >= 0) {
+                                                          updateStockLimit(activeSubId || '', item.id, newVal);
+                                                        }
+                                                        setEditingLimitId(null);
+                                                      } else if (e.key === 'Escape') {
+                                                        setEditingLimitId(null);
+                                                      }
+                                                    }}
+                                                    autoFocus
+                                                    onClick={(e) => e.stopPropagation()}
+                                                  />
+                                                </div>
                                               ) : (
-                                                <span 
-                                                  onClick={() => {
-                                                    setEditingLimitId(item.id);
-                                                    setTempLimitValue((item.limit ?? 0).toString());
-                                                  }}
-                                                  className="text-xs font-black text-red-400 cursor-pointer hover:bg-red-500/10 px-1 rounded transition-colors"
-                                                  title="Klik untuk mengisi limit"
-                                                >
+                                                <span className="text-xs font-black text-red-400">
                                                   Limit: {item.limit ?? 0}
                                                 </span>
                                               )}
-                                              
-                                              <div className="flex items-center gap-1 border-l border-red-500/20 pl-2 ml-1">
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    updateStockLimit(activeSubId || '', item.id, Math.max(0, (item.limit ?? 0) - 1));
-                                                  }}
-                                                  className="w-5 h-5 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/40 text-xs font-black transition-all active:scale-75 select-none"
-                                                  title="Kurangi Batas Limit"
-                                                >
-                                                  -
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    updateStockLimit(activeSubId || '', item.id, (item.limit ?? 0) + 1);
-                                                  }}
-                                                  className="w-5 h-5 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/40 text-xs font-black transition-all active:scale-75 select-none"
-                                                  title="Tambah Batas Limit"
-                                                >
-                                                  +
-                                                </button>
-                                              </div>
                                             </div>
                                           </div>
                                         </div>
@@ -1007,9 +985,6 @@ Mohon Di proses`;
                                 <div className="flex items-center gap-4">
                                   <div className="text-right">
                                     <p className="text-sm font-black italic text-white">{entry.quantity} <span className="text-[10px] text-white/40 uppercase font-black">{entry.unit}</span></p>
-                                    {(entry.limit ?? 0) > 0 && (
-                                      <p className="text-[9px] font-bold text-red-400 mt-0.5">Limit: {entry.limit}</p>
-                                    )}
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <button 

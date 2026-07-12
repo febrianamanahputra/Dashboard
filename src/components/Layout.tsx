@@ -22,27 +22,44 @@ const SCOPES = [
 
 type Role = 'SM' | 'SCM' | 'FINANCE' | null;
 
+interface NoteItem {
+  id: string;
+  text: string;
+  color?: 'green' | 'purple' | 'red';
+}
+
 export default function Layout() {
   const [role, setRole] = useState<Role>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const { notifications, dismissNotification, markNotificationsAsRead, setAccessToken } = useApp();
   const [showNotebook, setShowNotebook] = useState(false);
-  const [notes, setNotes] = useState<{ id: string; text: string; date: string }[]>(() => {
-    const saved = localStorage.getItem('renovki_notes_v2');
-    return saved ? JSON.parse(saved) : [];
+  const [notes, setNotes] = useState<NoteItem[]>(() => {
+    const saved = localStorage.getItem('renovki_notes_v3');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // Fallback to legacy structure
+        const legacy = localStorage.getItem('renovki_notes_v2');
+        return legacy ? JSON.parse(legacy) : [];
+      }
+    }
+    const legacy = localStorage.getItem('renovki_notes_v2');
+    return legacy ? JSON.parse(legacy) : [];
   });
   const [currentNote, setCurrentNote] = useState('');
+  const [selectedNoteColor, setSelectedNoteColor] = useState<'green' | 'purple' | 'red'>('green');
 
   useEffect(() => {
-    localStorage.setItem('renovki_notes_v2', JSON.stringify(notes));
+    localStorage.setItem('renovki_notes_v3', JSON.stringify(notes));
   }, [notes]);
 
   const saveNote = () => {
     if (!currentNote.trim()) return;
-    const newNote = {
+    const newNote: NoteItem = {
       id: Date.now().toString(),
-      text: currentNote,
-      date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+      text: currentNote.trim(),
+      color: selectedNoteColor
     };
     setNotes([newNote, ...notes]);
     setCurrentNote('');
@@ -50,6 +67,18 @@ export default function Layout() {
 
   const deleteNote = (id: string) => {
     setNotes(notes.filter(n => n.id !== id));
+  };
+
+  const toggleNoteColor = (id: string) => {
+    setNotes(notes.map(n => {
+      if (n.id === id) {
+        const current = n.color || 'green';
+        const next: 'green' | 'purple' | 'red' = 
+          current === 'green' ? 'purple' : current === 'purple' ? 'red' : 'green';
+        return { ...n, color: next };
+      }
+      return n;
+    }));
   };
 
   const handleGoogleLogin = async () => {
@@ -229,7 +258,7 @@ export default function Layout() {
                   onClick={() => { setShowNotifications(false); setShowNotebook(false); }}
                 />
                 <SidebarLink 
-                  icon={<Heart size={24} />} 
+                  icon={<Send size={24} className="-rotate-12 text-white" />} 
                   label="Notebook" 
                   active={showNotebook}
                   onClick={() => setShowNotebook(true)}
@@ -283,7 +312,7 @@ export default function Layout() {
                     }}
                     className="p-1 transition-opacity text-white opacity-100 active:opacity-60"
                   >
-                    <Heart size={24} strokeWidth={2} />
+                    <Send size={24} strokeWidth={2} className="-rotate-12" />
                   </button>
                   <button 
                     onClick={() => {
@@ -340,11 +369,11 @@ export default function Layout() {
                          <div className="w-12 h-1.5 bg-white/10 rounded-full" />
                       </div>
 
-                      <div className="p-6 flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-                        <div className="flex items-center justify-between mb-6">
+                      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col px-6 pt-2 pb-4">
+                        <div className="flex items-center justify-between mb-5 shrink-0">
                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10">
-                                 <Heart size={20} fill="currentColor" className="text-pink-500" />
+                              <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-sky-400 border border-white/10">
+                                 <Send size={20} className="-rotate-12" />
                               </div>
                               <div>
                                  <h3 className="text-xl font-bold text-white tracking-tight italic">Buku Catatan</h3>
@@ -359,72 +388,116 @@ export default function Layout() {
                            </button>
                         </div>
 
-                        {/* Input Area */}
-                        <div className="space-y-4 mb-8 shrink-0">
-                           <div className="relative group">
-                              <textarea 
-                                 className="w-full h-32 p-4 bg-white/5 border border-white/10 rounded-2xl outline-none text-white font-medium placeholder:text-white/20 transition-all focus:bg-white/10 focus:border-lime-500/30"
-                                 placeholder="Tulis catatan di sini..."
-                                 value={currentNote}
-                                 onChange={(e) => setCurrentNote(e.target.value)}
-                              />
-                              <div className="absolute top-4 right-4 text-white/10">
-                                 <Send size={16} />
-                              </div>
-                           </div>
-                           <button 
-                              onClick={saveNote}
-                              disabled={!currentNote.trim()}
-                              className="w-full py-4 bg-lime-500/20 hover:bg-lime-500/30 disabled:opacity-30 text-lime-400 border border-lime-500/20 font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg tracking-[0.2em] text-xs uppercase"
-                           >
-                              Simpan Catatan
-                           </button>
-                        </div>
-
-                        {/* List Area */}
-                        <div className="flex-1 flex flex-col group/list">
-                           <div className="flex items-center gap-2 mb-4 shrink-0">
+                        {/* List Area on TOP */}
+                        <div className="flex-1 flex flex-col group/list min-h-[200px]">
+                           <div className="flex items-center justify-between mb-4 shrink-0">
                               <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Catatan Tersimpan</p>
-                              <div className="h-px flex-1 bg-white/5" />
+                              <span className="text-[9px] font-black text-white/30 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-full">
+                                 {notes.length} Catatan
+                              </span>
                            </div>
 
-                           <div className="space-y-3 pb-8">
+                           <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 pb-4">
                              {notes.length === 0 ? (
-                               <div className="py-12 flex flex-col items-center justify-center text-white/10 italic">
-                                 <Heart size={32} strokeWidth={1} className="mb-2 opacity-20" />
-                                 <p className="text-xs">Belum ada catatan</p>
+                               <div className="h-48 flex flex-col items-center justify-center text-white/10 italic">
+                                 <Send size={32} strokeWidth={1} className="mb-2 opacity-20 -rotate-12 text-white/40" />
+                                 <p className="text-xs font-bold text-white/30">Belum ada catatan</p>
+                                 <p className="text-[9px] text-white/20 uppercase tracking-wider mt-1">Tulis catatan di bawah untuk memulai</p>
                                </div>
                              ) : (
-                               notes.map((note) => (
-                                 <div 
-                                   key={note.id} 
-                                   className="flex items-center gap-4 p-4 bg-white/[0.03] border border-white/5 rounded-2xl group hover:border-lime-500/20 transition-all"
-                                 >
-                                   {/* Drag Handle Mockup */}
-                                   <div className="grid grid-cols-2 gap-0.5 shrink-0">
-                                      {[...Array(6)].map((_, i) => (
-                                        <div key={i} className="w-1 h-1 bg-white/10 rounded-full" />
-                                      ))}
-                                   </div>
-
-                                   <div className="flex-1 min-w-0">
-                                      <div className="flex flex-col gap-1">
-                                         <p className="text-sm font-medium text-white/90 leading-relaxed">{note.text}</p>
-                                         <div className="flex items-center gap-2">
-                                            <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">{note.date}</span>
-                                         </div>
-                                      </div>
-                                   </div>
-
-                                   <button 
-                                      onClick={() => deleteNote(note.id)}
-                                      className="text-white/10 hover:text-red-500 p-2 transition-colors hover:bg-red-500/10 rounded-xl"
-                                   >
-                                      <X size={16} />
-                                   </button>
-                                 </div>
-                               ))
+                               <div className="flex flex-wrap gap-2.5">
+                                 {notes.map((note) => {
+                                   const noteColor = note.color || 'green';
+                                   return (
+                                     <div 
+                                       key={note.id} 
+                                       onClick={() => toggleNoteColor(note.id)}
+                                       className={`inline-flex items-center gap-2.5 px-3.5 py-2 rounded-full border transition-all cursor-pointer select-none active:scale-95 duration-150 ${
+                                         noteColor === 'purple' 
+                                           ? 'bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-400 hover:bg-fuchsia-500/15 hover:border-fuchsia-500/30' 
+                                           : noteColor === 'red' 
+                                             ? 'bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/15 hover:border-rose-500/30' 
+                                             : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/15 hover:border-emerald-500/30'
+                                       }`}
+                                       title="Klik untuk ubah warna"
+                                     >
+                                       {/* Color indicator dot */}
+                                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                         noteColor === 'purple' 
+                                           ? 'bg-fuchsia-400 shadow-[0_0_8px_rgba(232,121,249,0.6)]' 
+                                           : noteColor === 'red' 
+                                             ? 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.6)]' 
+                                             : 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+                                       }`} />
+                                       
+                                       <span className="text-xs font-bold leading-none pr-1">{note.text}</span>
+                                       
+                                       <button 
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           deleteNote(note.id);
+                                         }}
+                                         className="text-white/30 hover:text-white p-0.5 rounded-full transition-colors hover:bg-white/10 shrink-0"
+                                         title="Hapus"
+                                       >
+                                         <X size={12} className="stroke-[2.5]" />
+                                       </button>
+                                     </div>
+                                   );
+                                 })}
+                               </div>
                              )}
+                           </div>
+                        </div>
+
+                        {/* Input Area on BOTTOM */}
+                        <div className="shrink-0 bg-white/[0.02] border border-white/5 rounded-[28px] p-4 mt-auto space-y-3 shadow-xl">
+                           <div className="flex items-center justify-between">
+                              <p className="text-[9px] font-black text-white/30 uppercase tracking-widest ml-1">Pilih Warna & Tulis Catatan</p>
+                              
+                              {/* Color Selector */}
+                              <div className="flex items-center gap-2">
+                                 {(['green', 'purple', 'red'] as const).map((col) => (
+                                    <button
+                                       key={col}
+                                       type="button"
+                                       onClick={() => setSelectedNoteColor(col)}
+                                       className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                                          selectedNoteColor === col 
+                                             ? 'ring-2 ring-white ring-offset-2 ring-offset-black scale-110' 
+                                             : 'opacity-50 hover:opacity-100'
+                                       }`}
+                                    >
+                                       <span className={`w-3.5 h-3.5 rounded-full ${
+                                          col === 'green' ? 'bg-emerald-400' : col === 'purple' ? 'bg-fuchsia-400' : 'bg-rose-400'
+                                       }`} />
+                                    </button>
+                                 ))}
+                              </div>
+                           </div>
+
+                           {/* Single Line Pill Input */}
+                           <div className="relative flex items-center">
+                              <input 
+                                 type="text"
+                                 className="w-full pl-4 pr-12 py-3 bg-white/5 border border-white/10 rounded-full outline-none text-xs font-bold text-white placeholder:text-white/20 transition-all focus:bg-white/10 focus:border-white/20"
+                                 placeholder="Tulis catatan satu baris di sini..."
+                                 value={currentNote}
+                                 onChange={(e) => setCurrentNote(e.target.value)}
+                                 onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                       saveNote();
+                                    }
+                                 }}
+                              />
+                              <button 
+                                 onClick={saveNote}
+                                 disabled={!currentNote.trim()}
+                                 className="absolute right-1.5 p-2 bg-white text-black disabled:bg-white/5 disabled:text-white/20 rounded-full transition-all active:scale-95 shadow-md flex items-center justify-center"
+                                 title="Kirim"
+                              >
+                                 <Send size={12} className="-rotate-12 stroke-[2.5]" />
+                              </button>
                            </div>
                         </div>
                       </div>
