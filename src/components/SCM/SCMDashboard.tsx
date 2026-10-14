@@ -1,1555 +1,1142 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useApp } from '../../AppContext';
-import { Truck, Package, Clock, CheckCircle2, CreditCard, ChevronRight, Pause, Play, X, Send, History, Check, AlertTriangle, Trash2, Plus, RefreshCw, FileSpreadsheet, Wallet, LayoutGrid, List } from 'lucide-react';
-import { RequestStatus, MaterialRequest } from '../../types';
+import { 
+  CreditCard, 
+  Edit3, 
+  MessageCircle, 
+  Check, 
+  Copy, 
+  Store, 
+  User, 
+  Phone, 
+  MapPin, 
+  Package, 
+  Building2, 
+  X, 
+  Plus, 
+  Trash2, 
+  History, 
+  RotateCcw,
+  Tag,
+  CheckCircle2,
+  FolderPlus,
+  Layers
+} from 'lucide-react';
 
-const handleEnterNextField = (e: React.KeyboardEvent<HTMLElement>) => {
-  if (e.key === 'Enter' && e.currentTarget.tagName !== 'TEXTAREA') {
-    e.preventDefault();
-    const current = e.currentTarget;
-    let nextElement: HTMLElement | null = null;
-    
-    const form = (current as HTMLInputElement).form;
-    if (form) {
-      const elements = Array.from(form.elements) as HTMLElement[];
-      const index = elements.indexOf(current as any);
-      if (index > -1) {
-        let i = index + 1;
-        while (elements[i]) {
-          const el = elements[i];
-          if (
-            (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'BUTTON') &&
-            !(el as any).disabled && (el as any).type !== 'hidden'
-          ) {
-            nextElement = el;
-            break;
-          }
-          i++;
-        }
-      }
-    } else {
-      const container = current.closest('.space-y-1\\.5') || current.closest('.space-y-3') || current.parentElement?.parentElement;
-      if (container) {
-        const focusables = Array.from(container.querySelectorAll('input, select, button')) as HTMLElement[];
-        const index = focusables.indexOf(current);
-        if (index > -1) {
-          let i = index + 1;
-          while (focusables[i]) {
-            const el = focusables[i];
-            const isInput = el.tagName === 'INPUT' || el.tagName === 'SELECT';
-            const isSubmit = el.tagName === 'BUTTON' && (el as any).type === 'submit';
-            if (isInput || isSubmit) {
-              nextElement = el;
-              break;
-            }
-            i++;
-          }
-        }
-      }
-    }
+export interface BankAccount {
+  id: string;
+  bank: string;
+  noRekening: string;
+}
 
-    if (nextElement) {
-      nextElement.focus();
-    }
+export interface VendorCard {
+  id: string;
+  nama: string; // Penerima A/N
+  nomorHp: string;
+  namaToko: string;
+  kategori: string;
+  bankAccounts: BankAccount[];
+}
+
+interface ReportHistory {
+  id: string;
+  timestamp: string;
+  item: string;
+  lokasi: string;
+  vendorNama: string;
+  bankAccounts: BankAccount[];
+  namaToko: string;
+}
+
+const DEFAULT_CATEGORIES = [
+  'Material Pokok',
+  'Bahan Bangunan',
+  'Besi & Baja',
+  'Cat & Finishing'
+];
+
+const DEFAULT_CARDS: VendorCard[] = [
+  {
+    id: '1',
+    nama: 'Rusnawati',
+    nomorHp: '08111949322',
+    namaToko: 'TB Rusnawati Jaya',
+    kategori: 'Material Pokok',
+    bankAccounts: [
+      { id: 'b1', bank: 'BRI', noRekening: '707301021739533' },
+      { id: 'b2', bank: 'BCA', noRekening: '8690123456' }
+    ]
+  },
+  {
+    id: '2',
+    nama: 'H. Rusli',
+    nomorHp: '081298765432',
+    namaToko: 'Pusat Pasir & Batu Alam',
+    kategori: 'Material Pokok',
+    bankAccounts: [
+      { id: 'b1', bank: 'BCA', noRekening: '8690123456' }
+    ]
+  },
+  {
+    id: '3',
+    nama: 'Budi Santoso',
+    nomorHp: '081387654321',
+    namaToko: 'Depo Semen & Besi Mandiri',
+    kategori: 'Besi & Baja',
+    bankAccounts: [
+      { id: 'b1', bank: 'Mandiri', noRekening: '1370019827364' }
+    ]
   }
-};
+];
 
-const toTitleCase = (str: string) => {
-  if (!str) return '';
-  return str.split(' ').map(word => {
-    if (word.length === 0) return word;
-    return word.charAt(0).toUpperCase() + word.slice(1);
-  }).join(' ');
-};
-
-const handleTitleCaseChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
-  const { value, selectionStart, selectionEnd } = e.target;
-  const transformed = toTitleCase(value);
-  setter(transformed);
-  
-  requestAnimationFrame(() => {
-    if (e.target) {
-      e.target.setSelectionRange(selectionStart, selectionEnd);
-    }
-  });
-};
+const POPULAR_BANKS = ['BRI', 'BCA', 'Mandiri', 'BNI', 'BSI', 'CIMB'];
 
 export default function SCMDashboard() {
-  const { 
-    profiles = [],
-    subs = [], 
-    requests = [], 
-    updateRequestStatus, 
-    approveEdit, 
-    rejectEdit, 
-    deleteRequest, 
-    mainMaterials = [], 
-    addMainMaterial, 
-    deleteMainMaterial,
-    syncDirectToSheet
-  } = useApp();
-  const [showPaymentModal, setShowPaymentModal] = useState<MaterialRequest | null>(null);
-  const [showBulkPaymentModal, setShowBulkPaymentModal] = useState<MaterialRequest[] | null>(null);
-  const [showMainMaterialModal, setShowMainMaterialModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
-  const [viewingHistorySubId, setViewingHistorySubId] = useState<string | null>(null);
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<'list' | 'thumbnail'>('list');
-  const [selectedStatusDetail, setSelectedStatusDetail] = useState<{ subId: string; status: RequestStatus } | null>(null);
-
-  const selectedRequests = requests.filter(r => selectedItemIds.includes(r.id));
-  const hasSelection = selectedRequests.length > 0;
-  const uniqueStatuses = Array.from(new Set(selectedRequests.map(r => r.status))) as RequestStatus[];
-  const allSelectedHaveSameStatus = uniqueStatuses.length === 1;
-  const commonStatus = allSelectedHaveSameStatus ? uniqueStatuses[0] : null;
-  const showFloatingActionBoard = hasSelection && allSelectedHaveSameStatus;
-
-  const handleBulkProcess = async () => {
-    for (const req of selectedRequests) {
-      updateRequestStatus(req.id, 'processing');
-    }
-    setSelectedItemIds([]);
-  };
-
-  const handleBulkApprovePayment = async () => {
-    for (const req of selectedRequests) {
-      updateRequestStatus(req.id, 'paid');
-    }
-    setSelectedItemIds([]);
-  };
-
-  const handleBulkShip = async () => {
-    for (const req of selectedRequests) {
-      updateRequestStatus(req.id, 'delivered');
-    }
-    setSelectedItemIds([]);
-  };
-
-  useEffect(() => {
-    const hasOpenModal = !!(showPaymentModal || showBulkPaymentModal || showMainMaterialModal || selectedStatusDetail);
-
-    const handlePopState = (e: PopStateEvent) => {
-      if (e.state && !e.state.isSubNav && e.state.role === null) return;
-
-      if (showPaymentModal) {
-        setShowPaymentModal(null);
-      } else if (showBulkPaymentModal) {
-        setShowBulkPaymentModal(null);
-      } else if (showMainMaterialModal) {
-        setShowMainMaterialModal(false);
-      } else if (selectedStatusDetail) {
-        setSelectedStatusDetail(null);
-      } else if (viewingHistorySubId) {
-        setViewingHistorySubId(null);
-      } else if (activeTab !== 'active') {
-        setActiveTab('active');
+  // 1. Categories State (Stored in localStorage)
+  const [categories, setCategories] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('scm_vendor_categories');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
+    } catch (e) {
+      console.error('Failed to load categories', e);
+    }
+    return DEFAULT_CATEGORIES;
+  });
+
+  // 2. Cards State (Stored in localStorage, with backward compatibility)
+  const [cards, setCards] = useState<VendorCard[]>(() => {
+    try {
+      const saved = localStorage.getItem('scm_vendor_cards');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Normalize older card formats if they had single bank/noRekening
+          return parsed.map((card: any, idx: number) => {
+            const bankAccounts = Array.isArray(card.bankAccounts) && card.bankAccounts.length > 0
+              ? card.bankAccounts
+              : [{ id: 'b_' + idx, bank: card.bank || 'BRI', noRekening: card.noRekening || '707301021739533' }];
+            return {
+              id: card.id || String(Date.now() + idx),
+              nama: card.nama || 'Nama Penerima',
+              nomorHp: card.nomorHp || '',
+              namaToko: card.namaToko || 'Toko Vendor',
+              kategori: card.kategori || DEFAULT_CATEGORIES[0],
+              bankAccounts
+            };
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load vendor cards', e);
+    }
+    return DEFAULT_CARDS;
+  });
+
+  const [activeCardId, setActiveCardId] = useState<string>(() => {
+    return cards[0]?.id || '1';
+  });
+
+  const currentCard = cards.find(c => c.id === activeCardId) || cards[0] || DEFAULT_CARDS[0];
+
+  // 3. Detail Pembayaran Inputs (Lokasi & Item)
+  const [lokasi, setLokasi] = useState('Workshop');
+  const [item, setItem] = useState('Pasir');
+
+  // 4. Modals & UI Controls
+  const [isSelectorModalOpen, setIsSelectorModalOpen] = useState(false);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('Semua');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editCardData, setEditCardData] = useState<VendorCard>(currentCard);
+  const [isCreatingNewCard, setIsCreatingNewCard] = useState(false);
+
+  const [copied, setCopied] = useState(false);
+  const [copiedRekening, setCopiedRekening] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // 5. Reporting History
+  const [history, setHistory] = useState<ReportHistory[]>(() => {
+    try {
+      const saved = localStorage.getItem('scm_report_history');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error('Failed to load history', e);
+    }
+    return [];
+  });
+
+  // Persist Categories
+  useEffect(() => {
+    try {
+      localStorage.setItem('scm_vendor_categories', JSON.stringify(categories));
+    } catch (e) {
+      console.error('Failed to save categories', e);
+    }
+  }, [categories]);
+
+  // Persist Cards
+  useEffect(() => {
+    try {
+      localStorage.setItem('scm_vendor_cards', JSON.stringify(cards));
+    } catch (e) {
+      console.error('Failed to save cards', e);
+    }
+  }, [cards]);
+
+  // Persist History
+  useEffect(() => {
+    try {
+      localStorage.setItem('scm_report_history', JSON.stringify(history));
+    } catch (e) {
+      console.error('Failed to save history', e);
+    }
+  }, [history]);
+
+  // Primary Bank Account for the Card Display (only 1 displayed on card)
+  const primaryBank = currentCard.bankAccounts?.[0] || {
+    id: 'b1',
+    bank: 'BRI',
+    noRekening: '707301021739533'
+  };
+
+  // Generate WhatsApp message caption including ALL entered banks
+  const buildWaCaption = (
+    c: VendorCard = currentCard, 
+    loc: string = lokasi, 
+    itm: string = item
+  ) => {
+    const accounts = c.bankAccounts && c.bankAccounts.length > 0 
+      ? c.bankAccounts 
+      : [{ id: 'b1', bank: 'BRI', noRekening: '707301021739533' }];
+
+    let bankLines = '';
+    if (accounts.length === 1) {
+      bankLines = `No Rekening : ${accounts[0].noRekening || '-'}\nBank : ${accounts[0].bank || '-'}`;
+    } else {
+      bankLines = accounts.map((acc, idx) => {
+        const suffix = idx === 0 ? '' : ` ${idx + 1}`;
+        return `No Rekening${suffix} : ${acc.noRekening || '-'}\nBank${suffix} : ${acc.bank || '-'}`;
+      }).join('\n');
+    }
+
+    return `Bismillah @08111949322
+
+- Nota Pembayaran
+${bankLines}
+Penerima A/N : ${c.nama || '-'}
+Item Pembelian : ${itm || '-'}
+Lokasi :${loc || '-'}`;
+  };
+
+  const currentWaMessage = buildWaCaption();
+
+  const handleCopyCaption = () => {
+    navigator.clipboard.writeText(currentWaMessage);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyRekening = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(primaryBank.noRekening);
+    setCopiedRekening(true);
+    setTimeout(() => setCopiedRekening(false), 2000);
+  };
+
+  // Direct to WhatsApp without target number (allows user to select recipient in WA)
+  const handleDirectWa = () => {
+    // Record into history
+    const newEntry: ReportHistory = {
+      id: Date.now().toString(),
+      timestamp: new Date().toLocaleString('id-ID', { 
+        day: 'numeric', 
+        month: 'short', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }),
+      item,
+      lokasi,
+      vendorNama: currentCard.nama,
+      bankAccounts: currentCard.bankAccounts,
+      namaToko: currentCard.namaToko
     };
+    setHistory(prev => [newEntry, ...prev.slice(0, 19)]);
 
-    if (hasOpenModal || activeTab !== 'active' || viewingHistorySubId) {
-      window.history.pushState({ role: 'SCM', isSubNav: true }, '');
-    }
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [showPaymentModal, showBulkPaymentModal, showMainMaterialModal, activeTab, viewingHistorySubId, selectedStatusDetail]);
-
-  const getStatusLabel = (s: string) => {
-    switch (s) {
-      case 'pending': return 'Belum Di Proses';
-      case 'processing': return 'Sedang Di Proses';
-      case 'awaiting_payment': return 'Menunggu Pembayaran';
-      case 'paid': return 'Pembayaran Berhasil';
-      case 'delivered': return 'Pengantaran';
-      case 'received': return 'Selesai Diterima';
-      case 'on_hold': return 'Tertunda (Hold)';
-      default: return s;
-    }
-  };
-
-  const getStatusColor = (s: string) => {
-    switch (s) {
-      case 'pending': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-      case 'processing': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-      case 'awaiting_payment': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
-      case 'paid': return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
-      case 'delivered': return 'bg-green-500/10 text-green-400 border-green-500/20';
-      case 'received': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      case 'on_hold': return 'bg-red-500/10 text-red-400 border-red-500/20';
-      default: return 'bg-white/5 text-white border-white/10';
-    }
-  };
-
-  const getStatusHexColor = (s: string) => {
-    switch (s) {
-      case 'pending': return '#EAB308';
-      case 'processing': return '#F97316';
-      case 'awaiting_payment': return '#A855F7';
-      case 'paid': return '#6366F1';
-      case 'delivered': return '#22C55E';
-      case 'received': return '#10B981';
-      case 'on_hold': return '#EF4444';
-      default: return '#9CA3AF';
-    }
-  };
-
-  const getRequestTheme = (s: string) => {
-    switch (s) {
-      case 'pending': 
-        return {
-          bg: 'bg-white/5 backdrop-blur-md border border-white/10',
-          text: 'text-white',
-          badge: 'bg-white/5 text-white border-white/10',
-          watermark: <Clock size={80} className="absolute -right-4 -bottom-4 text-white/5 rotate-12" />
-        };
-      case 'processing':
-        return {
-          bg: 'bg-gradient-to-br from-[#FF8C00]/20 to-[#FF4500]/20 backdrop-blur-md border border-orange-500/20',
-          text: 'text-orange-100',
-          badge: 'bg-orange-500/20 text-orange-200 border-orange-500/30',
-          watermark: <RefreshCw size={80} className="absolute -right-4 -bottom-4 text-orange-500/10 rotate-12" />
-        };
-      case 'awaiting_payment':
-        return {
-          bg: 'bg-gradient-to-br from-[#2E0854]/20 to-[#4B0082]/20 backdrop-blur-md border border-purple-500/20',
-          text: 'text-purple-100',
-          badge: 'bg-purple-500/20 text-purple-200 border-purple-500/30',
-          watermark: <Wallet size={80} className="absolute -right-4 -bottom-4 text-purple-500/10 rotate-12" />
-        };
-      case 'paid':
-        return {
-          bg: 'bg-gradient-to-br from-[#8A2BE2]/20 to-[#B06AB3]/20 backdrop-blur-md border border-indigo-500/20',
-          text: 'text-indigo-100',
-          badge: 'bg-indigo-500/20 text-indigo-200 border-indigo-500/30',
-          watermark: <CheckCircle2 size={80} className="absolute -right-4 -bottom-4 text-indigo-500/10 rotate-12" />
-        };
-      case 'delivered':
-        return {
-          bg: 'bg-gradient-to-br from-[#25D366]/20 to-[#128C7E]/20 backdrop-blur-md border border-green-500/20',
-          text: 'text-green-100',
-          badge: 'bg-green-500/20 text-green-200 border-green-500/30',
-          watermark: <Truck size={80} className="absolute -right-4 -bottom-4 text-green-500/10 rotate-12" />
-        };
-      default:
-        return {
-          bg: 'bg-white/5 backdrop-blur-md border border-white/10',
-          text: 'text-white',
-          badge: 'bg-white/5 text-white border-white/10',
-          watermark: <Package size={80} className="absolute -right-4 -bottom-4 text-white/5 rotate-12" />
-        };
-    }
-  };
-
-  const STATUS_ORDER: Record<string, number> = {
-    pending: 1,
-    processing: 2,
-    awaiting_payment: 3,
-    paid: 4,
-    delivered: 5,
-    on_hold: 6,
-    received: 7,
-  };
-
-  const relevantRequests = requests.filter(r => r.status !== 'received');
-
-  const subsWithRequests = subs.map(sub => {
-    const sortedRequests = relevantRequests
-      .filter(r => r.subId === sub.id)
-      .sort((a, b) => {
-        const wa = STATUS_ORDER[a.status] || 99;
-        const wb = STATUS_ORDER[b.status] || 99;
-        return wa - wb;
-      });
-    return {
-      ...sub,
-      requests: sortedRequests
-    };
-  }).filter(sub => sub.requests.length > 0);
-
-  // History extraction per sub
-  const historyBySub = subs.map(sub => {
-    const receivedReqs = requests
-      .filter(r => r.subId === sub.id && r.status === 'received')
-      .map(r => {
-        const receivedEntry = r.history.find(h => h.status === 'received');
-        return {
-          ...r,
-          receivedAt: receivedEntry?.timestamp || 0
-        };
-      })
-      .sort((a, b) => b.receivedAt - a.receivedAt);
+    // Construct WA universal share link without specific phone number
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(currentWaMessage)}`;
     
-    return { ...sub, history: receivedReqs };
-  }).filter(sub => sub.history.length > 0);
+    const win = window.open(waUrl, '_blank');
+    if (!win) {
+      window.location.href = waUrl;
+    }
+  };
 
-  const orphanedRequests = relevantRequests
-    .filter(r => !subs.some(s => s.id === r.subId))
-    .sort((a, b) => {
-      const wa = STATUS_ORDER[a.status] || 99;
-      const wb = STATUS_ORDER[b.status] || 99;
-      return wa - wb;
-    });
+  // Categories helper
+  const handleAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    if (!categories.includes(trimmed)) {
+      setCategories(prev => [...prev, trimmed]);
+      setSelectedCategoryFilter(trimmed);
+    }
+    setNewCategoryName('');
+    setIsAddingCategory(false);
+  };
+
+  const handleDeleteCategory = (catToDelete: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (categories.length <= 1) return;
+    setCategories(prev => prev.filter(c => c !== catToDelete));
+    if (selectedCategoryFilter === catToDelete) {
+      setSelectedCategoryFilter('Semua');
+    }
+  };
+
+  // Card selector helpers
+  const filteredCards = selectedCategoryFilter === 'Semua'
+    ? cards
+    : cards.filter(c => c.kategori === selectedCategoryFilter);
+
+  const handleDeleteCard = (cardId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (cards.length <= 1) return;
+    const remaining = cards.filter(c => c.id !== cardId);
+    setCards(remaining);
+    if (activeCardId === cardId) {
+      setActiveCardId(remaining[0].id);
+    }
+  };
+
+  // Open Edit modal for existing card
+  const handleOpenEditModal = (card: VendorCard = currentCard) => {
+    setIsCreatingNewCard(false);
+    setEditCardData(JSON.parse(JSON.stringify(card)));
+    setIsEditModalOpen(true);
+  };
+
+  // Open Create modal for new card
+  const handleOpenCreateModal = (presetCategory?: string) => {
+    setIsCreatingNewCard(true);
+    const newCard: VendorCard = {
+      id: Date.now().toString(),
+      nama: '',
+      nomorHp: '',
+      namaToko: '',
+      kategori: presetCategory && presetCategory !== 'Semua' ? presetCategory : (categories[0] || 'Material Pokok'),
+      bankAccounts: [
+        { id: 'b_' + Date.now(), bank: 'BRI', noRekening: '' }
+      ]
+    };
+    setEditCardData(newCard);
+    setIsEditModalOpen(true);
+  };
+
+  // Save Card (Edit or Create)
+  const handleSaveCard = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isCreatingNewCard) {
+      setCards(prev => [...prev, editCardData]);
+      setActiveCardId(editCardData.id);
+    } else {
+      setCards(prev => prev.map(c => c.id === editCardData.id ? editCardData : c));
+    }
+    setIsEditModalOpen(false);
+  };
+
+  // Bank accounts in Edit form
+  const handleAddBankAccount = () => {
+    const newBank: BankAccount = {
+      id: 'b_' + Date.now(),
+      bank: 'BCA',
+      noRekening: ''
+    };
+    setEditCardData(prev => ({
+      ...prev,
+      bankAccounts: [...prev.bankAccounts, newBank]
+    }));
+  };
+
+  const handleUpdateBankAccount = (index: number, field: 'bank' | 'noRekening', value: string) => {
+    const updated = [...editCardData.bankAccounts];
+    updated[index] = { ...updated[index], [field]: value };
+    setEditCardData(prev => ({ ...prev, bankAccounts: updated }));
+  };
+
+  const handleRemoveBankAccount = (index: number) => {
+    if (editCardData.bankAccounts.length <= 1) return;
+    const updated = editCardData.bankAccounts.filter((_, i) => i !== index);
+    setEditCardData(prev => ({ ...prev, bankAccounts: updated }));
+  };
+
+  // Format account digits with spacing for credit-card look
+  const formatCardDigits = (digits: string) => {
+    if (!digits) return '---- ---- ---- ----';
+    const clean = digits.replace(/\s+/g, '');
+    return clean.match(/.{1,4}/g)?.join(' ') || clean;
+  };
 
   return (
-    <div className="relative h-full flex flex-col pt-[env(safe-area-inset-top)]">
-      <div className="relative z-10 flex flex-col h-full overflow-hidden">
-        <header className="flex flex-col px-4 py-4 bg-black/40 backdrop-blur-md border-b border-white/10 shrink-0 gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                 <Truck size={20} className="text-white" strokeWidth={2.5} />
-              </div>
-              <div>
-                 <h2 className="text-base font-black tracking-tight leading-none mb-1 text-white">Divisi SCM</h2>
-                 <p className="text-white/40 text-[9px] font-black uppercase tracking-[0.15em]">Kontrol Suplai</p>
-              </div>
-            </div>
-            
-            <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-               <button 
-                onClick={() => { setActiveTab('active'); setViewingHistorySubId(null); }}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all ${activeTab === 'active' ? 'bg-white shadow-lg text-black' : 'text-white/40'}`}
-               >
-                 Aktif
-               </button>
-               <button 
-                onClick={() => setActiveTab('history')}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all ${activeTab === 'history' ? 'bg-white shadow-lg text-black' : 'text-white/40'}`}
-               >
-                 Riwayat
-               </button>
-               <button 
-                onClick={() => setShowMainMaterialModal(true)}
-                className="ml-2 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter text-white bg-green-600 shadow-lg hover:bg-green-700 transition-all flex items-center gap-1.5"
-               >
-                 <Plus size={14} strokeWidth={3} />
-                 Material
-               </button>
-            </div>
+    <div className="h-full flex flex-col overflow-y-auto px-4 py-5 lg:px-8 max-w-2xl mx-auto custom-scrollbar safe-area-pb">
+      {/* Header Info & Action Buttons */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              Pelaporan SCM
+            </h2>
           </div>
-          
-          {activeTab === 'active' && (
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between">
-                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Antrian</p>
-                   <p className="text-sm font-black italic text-white">{relevantRequests.length}</p>
-                </div>
+          <p className="text-xs text-white/50 mt-0.5">
+            Pelaporan pembayaran material via WhatsApp
+          </p>
+        </div>
 
-                <div className="flex-1 bg-white/10 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between">
-                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Menunggu</p>
-                   <p className="text-sm font-black italic text-white">{relevantRequests.filter(r => r.status === 'pending').length}</p>
-                </div>
-              </div>
-
-              <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white text-black shadow-lg shadow-white/10' : 'text-white/40 hover:text-white'}`}
-                  title="List View"
-                >
-                  <List size={16} strokeWidth={2.5} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('thumbnail')}
-                  className={`p-2 rounded-xl transition-all ${viewMode === 'thumbnail' ? 'bg-white text-black shadow-lg shadow-white/10' : 'text-white/40 hover:text-white'}`}
-                  title="Thumbnail View"
-                >
-                  <LayoutGrid size={16} strokeWidth={2.5} />
-                </button>
-              </div>
-            </div>
+        {/* Action icons */}
+        <div className="flex items-center gap-2">
+          {history.length > 0 && (
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all text-xs flex items-center gap-1.5"
+              title="Riwayat Pelaporan"
+            >
+              <History size={15} />
+              <span className="hidden sm:inline">Riwayat ({history.length})</span>
+            </button>
           )}
-        </header>
 
-        {activeTab === 'active' ? (
-          subsWithRequests.length === 0 && orphanedRequests.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-12 opacity-30">
-              <div className="w-24 h-24 rounded-full border border-black/20 flex items-center justify-center mb-6">
-                 <Truck size={48} strokeWidth={1} className="text-black" />
-              </div>
-              <h3 className="text-lg font-black text-black mb-1 uppercase tracking-tight">Armada Stand By</h3>
-              <p className="text-black/40 text-xs font-black uppercase tracking-widest">Tidak ada protokol logistik aktif terdeteksi</p>
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4 space-y-8">
-              {viewMode === 'list' ? (
-                <div className="space-y-6">
-                  {subsWithRequests.map((sub, idx) => {
-                    const profile = profiles.find(p => p.id === sub.profileId);
-                    return (
-                      <motion.div 
-                        key={sub.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className="space-y-4"
-                      >
-                        <div className="flex items-center justify-between px-2">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_10px_white]" />
-                            <h3 className="text-sm font-black tracking-tight text-white uppercase">
-                              {profile?.name} - {sub.name}
-                            </h3>
-                          </div>
-                          <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{sub.requests.length} Request</span>
-                        </div>
-
-                        <div className="space-y-4">
-                          {sub.requests.map((req) => {
-                            const isChecked = selectedItemIds.includes(req.id);
-                            return (
-                              <div key={req.id} className="flex items-center gap-3 w-full">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (isChecked) {
-                                      setSelectedItemIds(prev => prev.filter(id => id !== req.id));
-                                    } else {
-                                      setSelectedItemIds(prev => [...prev, req.id]);
-                                    }
-                                  }}
-                                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                                    isChecked 
-                                      ? 'bg-white border-white text-black shadow-lg shadow-white/20 scale-105' 
-                                      : 'border-white/20 bg-white/5 hover:border-white/45'
-                                  }`}
-                                  title="Pilih Item"
-                                >
-                                  {isChecked && <Check size={14} strokeWidth={4} />}
-                                </button>
-                                <div className="flex-1 min-w-0">
-                                  <RequestItem 
-                                    request={req} 
-                                    onStatusUpdate={updateRequestStatus} 
-                                    onApproveEdit={approveEdit} 
-                                    onRejectEdit={rejectEdit} 
-                                    onRequestPayment={setShowPaymentModal} 
-                                    locationName={`${profile?.name} - ${sub.name}`}
-                                    theme={getRequestTheme(req.status)}
-                                    statusLabel={getStatusLabel(req.status)}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {subsWithRequests.map((sub, idx) => {
-                    const profile = profiles.find(p => p.id === sub.profileId);
-                    
-                    // Group requests of this sub by status
-                    const groupedByStatus = sub.requests.reduce((acc, req) => {
-                      if (!acc[req.status]) {
-                        acc[req.status] = [];
-                      }
-                      acc[req.status].push(req);
-                      return acc;
-                    }, {} as Record<RequestStatus, MaterialRequest[]>);
-                    
-                    // Sort status keys dynamically using STATUS_ORDER
-                    const sortedStatusEntries = (Object.entries(groupedByStatus) as [RequestStatus, MaterialRequest[]][]).sort((a, b) => {
-                      return (STATUS_ORDER[a[0]] || 99) - (STATUS_ORDER[b[0]] || 99);
-                    });
-
-                    return (
-                      <motion.div
-                        key={sub.id}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="bg-white/5 border border-white/10 rounded-[32px] p-6 shadow-xl backdrop-blur-md flex flex-col hover:border-white/20 hover:shadow-2xl transition-all"
-                      >
-                        {/* Header: Photo and Name */}
-                        <div className="flex items-center gap-4 border-b border-white/10 pb-4 mb-4">
-                          {profile?.avatarUrl ? (
-                            <img 
-                              src={profile.avatarUrl} 
-                              alt={profile.name || "User"} 
-                              referrerPolicy="no-referrer"
-                              className="w-14 h-14 rounded-2xl object-cover border border-white/15 shadow-md shrink-0"
-                            />
-                          ) : (
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/15 shadow-md flex items-center justify-center text-white font-black text-lg shrink-0">
-                              {profile?.name ? profile.name.charAt(0).toUpperCase() : '?'}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-black text-white truncate leading-none mb-1 shadow-sm">
-                              {profile?.name || "Nama PM"}
-                            </h4>
-                            <p className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-2 truncate">
-                              {sub.name}
-                            </p>
-                            <span className="inline-block px-2.5 py-0.5 bg-white/5 border border-white/10 rounded-lg text-[9px] font-black text-white/70 uppercase tracking-wider">
-                              Project Manager (PM)
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Status List with Progress & Percentages */}
-                        <div className="flex-1 space-y-3">
-                          <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.15em] px-0.5 mb-1">Status Prosedur</p>
-                          {sortedStatusEntries.map(([status, itemReqs]) => {
-                            const percentage = Math.round((itemReqs.length / sub.requests.length) * 100);
-                            const hexColor = getStatusHexColor(status);
-                            return (
-                              <button
-                                key={status}
-                                type="button"
-                                onClick={() => setSelectedStatusDetail({ subId: sub.id, status: status as RequestStatus })}
-                                className="w-full flex flex-col p-3 bg-white/[0.02] hover:bg-white/10 border border-white/5 rounded-2xl transition-all text-left group"
-                              >
-                                <div className="flex items-center justify-between text-[11px] font-black text-white px-0.5">
-                                  <div className="flex items-center gap-2">
-                                    <span 
-                                      className="w-2.5 h-2.5 rounded-full transition-all group-hover:scale-110 shadow-md" 
-                                      style={{ backgroundColor: hexColor, boxShadow: `0 0 8px ${hexColor}` }} 
-                                    />
-                                    <span className="capitalize">{getStatusLabel(status)}</span>
-                                  </div>
-                                  <span className="text-white/40 group-hover:text-white transition-all">
-                                    {itemReqs.length} Item ({percentage}%)
-                                  </span>
-                                </div>
-                                
-                                {/* Progress Bar */}
-                                <div className="w-full h-1.5 bg-white/5 rounded-full mt-2.5 overflow-hidden">
-                                  <div 
-                                    className="h-full rounded-full transition-all duration-500" 
-                                    style={{ 
-                                      width: `${percentage}%`,
-                                      backgroundColor: hexColor 
-                                    }}
-                                  />
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
- 
-              {orphanedRequests.length > 0 && (
-                <div className="pt-10 border-t border-border-ig">
-                  <h3 className="text-xs font-bold text-ig-grey uppercase tracking-widest mb-6 px-2 text-red-500">Vektor Tak Terpeta (Lokasi Terhapus)</h3>
-                  <div className="space-y-4">
-                    {orphanedRequests.map(req => {
-                      const isChecked = selectedItemIds.includes(req.id);
-                      return (
-                        <div key={req.id} className="flex items-center gap-3 w-full">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isChecked) {
-                                setSelectedItemIds(prev => prev.filter(id => id !== req.id));
-                              } else {
-                                setSelectedItemIds(prev => [...prev, req.id]);
-                              }
-                            }}
-                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                              isChecked 
-                                ? 'bg-white border-white text-black shadow-lg shadow-white/20 scale-105' 
-                                : 'border-white/20 bg-white/5 hover:border-white/45'
-                            }`}
-                            title="Pilih Item"
-                          >
-                            {isChecked && <Check size={14} strokeWidth={4} />}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <RequestItem 
-                              key={req.id}
-                              request={req} 
-                              onStatusUpdate={updateRequestStatus} 
-                              onApproveEdit={approveEdit}
-                              onRejectEdit={rejectEdit}
-                              onRequestPayment={setShowPaymentModal}
-                              onDelete={(id) => {
-                                if (confirm('Hapus permintaan yang tidak memiliki lokasi ini?')) {
-                                  deleteRequest(id);
-                                }
-                              }}
-                              locationName="Domain Kosong"
-                              theme={getRequestTheme(req.status)}
-                              statusLabel={getStatusLabel(req.status)}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        ) : (
-          /* History View - Modified to drill-down by location */
-          <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 pb-20 px-4">
-            {!viewingHistorySubId ? (
-              /* Location List View */
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] px-2 mb-4">Pilih Lokasi Riwayat</h3>
-                {historyBySub.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center text-center p-20 opacity-40">
-                    <History size={48} className="text-white" />
-                    <p className="mt-4 font-black text-[10px] uppercase tracking-widest text-white">Belum Ada Riwayat Terdeteksi</p>
-                  </div>
-                ) : (
-                  <div className="grid gap-3">
-                    {historyBySub.map((sub) => {
-                      const profile = profiles.find(p => p.id === sub.profileId);
-                      return (
-                        <button
-                          key={sub.id}
-                          onClick={() => setViewingHistorySubId(sub.id)}
-                          className="bg-white/5 backdrop-blur-md border border-white/10 p-5 flex items-center justify-between rounded-3xl hover:bg-white/10 transition-all active:scale-[0.98] group shadow-sm"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white/40 group-hover:bg-white/10 group-hover:text-white transition-all border border-white/10">
-                              <Package size={24} />
-                            </div>
-                            <div className="text-left">
-                              <h4 className="text-sm font-black text-white italic tracking-tight uppercase leading-none mb-1">{sub.name}</h4>
-                              <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">{profile?.name}</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="text-[8px] font-black text-white bg-white/10 px-2.5 py-1 rounded-lg uppercase tracking-widest border border-white/10">
-                              {sub.history.length} ITEM
-                            </span>
-                            <ChevronRight size={16} className="text-white/20 group-hover:text-white group-hover:translate-x-1 transition-all" />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Detailed History per Sub View */
-              <div className="space-y-6">
-                {(() => {
-                  const subContent = historyBySub.find(s => s.id === viewingHistorySubId);
-                  const profile = profiles.find(p => p.id === subContent?.profileId);
-                  const fullName = `${profile?.name} - ${subContent?.name}`;
-
-                  return (
-                    <>
-                      <div className="flex items-center justify-between px-2 mb-6">
-                        <div className="flex items-center gap-4">
-                          <button 
-                            onClick={() => setViewingHistorySubId(null)}
-                            className="w-10 h-10 bg-white/10 rounded-2xl border border-white/10 flex items-center justify-center text-white shadow-lg active:scale-90 transition-all"
-                          >
-                            <ChevronRight size={20} className="rotate-180" />
-                          </button>
-                          <div>
-                            <h3 className="text-sm font-black text-white tracking-tight uppercase">{subContent?.name}</h3>
-                            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{profile?.name}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Hapus semua riwayat untuk lokasi "${subContent?.name}"?`)) {
-                              subContent?.history.forEach(item => deleteRequest(item.id));
-                              setViewingHistorySubId(null);
-                            }
-                          }}
-                          className="flex items-center gap-1 bg-red-500/10 text-red-500 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-500/10 hover:bg-red-500 hover:text-white transition-all"
-                        >
-                          <Trash2 size={12} /> Hapus Semua
-                        </button>
-                      </div>
-
-                      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[32px] divide-y divide-white/5 overflow-hidden shadow-2xl">
-                        {subContent?.history.map((item) => (
-                          <div key={item.id} className="p-5 flex items-center justify-between active:bg-white/5 transition-colors group">
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400 border border-green-500/10">
-                                <Package size={18} />
-                              </div>
-                              <div>
-                                <p className="text-sm font-black tracking-tight text-white uppercase">{item.materialName}</p>
-                                <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">
-                                  {new Date((item as any).receivedAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <p className="text-sm font-black italic text-white leading-none">
-                                  {item.quantity} 
-                                </p>
-                                <span className="text-[9px] text-white/40 uppercase font-black">{item.unit}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    syncDirectToSheet(item, fullName);
-                                    alert(`Sinkronisasi "${item.materialName}" dikirim ke Spreadsheet!`);
-                                  }}
-                                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-white/40 hover:text-white transition-all border border-white/5"
-                                  title="Sync to Sheet"
-                                >
-                                  <RefreshCw size={14} />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (confirm(`Hapus riwayat "${item.materialName}"?`)) {
-                                      deleteRequest(item.id);
-                                    }
-                                  }}
-                                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all border border-red-500/10 shadow-sm"
-                                  title="Hapus Riwayat"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-        )}
+          {/* Tombol Ganti Kartu: Opens Category & Saved Cards Modal */}
+          <button
+            onClick={() => setIsSelectorModalOpen(true)}
+            className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-xs flex items-center gap-2 shadow-sm transition-all"
+            title="Pilih & Ganti Kartu Vendor"
+          >
+            <Layers size={15} className="text-amber-400" />
+            <span>Ganti Kartu</span>
+          </button>
+        </div>
       </div>
 
-      <AnimatePresence>
-        {showFloatingActionBoard && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-sm bg-neutral-900 border border-white/10 rounded-2xl px-5 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] flex items-center justify-between gap-4"
-          >
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-white/50 uppercase tracking-widest leading-none mb-1">
-                {selectedRequests.length} Item Terpilih
-              </span>
-              <span className="text-xs font-black text-white italic capitalize">
-                {getStatusLabel(commonStatus || '')}
-              </span>
+      {/* 1. CARD DISPLAY (Interactive Payment Card - Only 1 Bank Displayed) */}
+      <div className="relative group mb-6">
+        {/* Ambient Glow */}
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-blue-500/20 rounded-3xl blur-xl opacity-60 group-hover:opacity-90 transition duration-500 pointer-events-none" />
+
+        <div
+          onClick={() => handleOpenEditModal(currentCard)}
+          className="relative w-full rounded-3xl p-6 cursor-pointer select-none bg-gradient-to-br from-zinc-900 via-neutral-900 to-black border border-white/20 shadow-2xl overflow-hidden hover:border-amber-400/50 hover:shadow-amber-500/10 transition-all duration-300 transform active:scale-[0.985]"
+        >
+          {/* Subtle Card Background Texture Accent */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-radial from-white/5 to-transparent rounded-full -mr-16 -mt-16 pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Top Bar: Chip + Nama Toko/Vendor + Bank badge */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              {/* EMV Metallic Golden Chip Accent */}
+              <div className="relative shrink-0">
+                <svg 
+                  className="w-12 h-9 rounded-md overflow-hidden shadow-md shadow-black/50 border border-amber-300/40" 
+                  viewBox="0 0 48 36" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect width="48" height="36" rx="4" fill="url(#chipGoldGradient)" />
+                  <rect x="1" y="1" width="46" height="34" rx="3" stroke="#FDE68A" strokeWidth="0.8" strokeOpacity="0.8" fill="none" />
+                  {/* Chip Tracings */}
+                  <path d="M 0 12 H 16 M 0 24 H 16 M 32 12 H 48 M 32 24 H 48 M 16 0 V 36 M 32 0 V 36 M 16 12 H 32 M 16 24 H 32" stroke="#78350F" strokeWidth="1" strokeOpacity="0.75" />
+                  <circle cx="24" cy="18" r="4.5" fill="#F59E0B" stroke="#92400E" strokeWidth="0.8" />
+                  <defs>
+                    <linearGradient id="chipGoldGradient" x1="0" y1="0" x2="48" y2="36" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#FDE68A" />
+                      <stop offset="0.25" stopColor="#F59E0B" />
+                      <stop offset="0.75" stopColor="#D97706" />
+                      <stop offset="1" stopColor="#B45309" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+
+              {/* Nama Toko / Vendor */}
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <Store size={13} className="text-amber-400 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/90 truncate">
+                    {currentCard.kategori || 'Vendor'}
+                  </span>
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate max-w-[190px] sm:max-w-[280px]">
+                  {currentCard.namaToko || 'Nama Toko / Vendor'}
+                </h3>
+              </div>
             </div>
 
-            <div className="flex gap-2">
+            {/* Display only 1 Bank on Card Face */}
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <span className="px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-black tracking-widest text-white shadow-inner uppercase">
+                {primaryBank.bank || 'BANK'}
+              </span>
+              {currentCard.bankAccounts && currentCard.bankAccounts.length > 1 && (
+                <span className="text-[9px] text-emerald-400 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  +{currentCard.bankAccounts.length - 1} Bank Lain
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Center: Nomor Rekening (Primary Bank only on card face) */}
+          <div className="my-5">
+            <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-widest text-white/40 mb-1.5">
+              <span>Nomor Rekening ({primaryBank.bank})</span>
               <button
-                type="button"
-                onClick={() => setSelectedItemIds([])}
-                className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-black text-[10px] transition-all active:scale-95 border border-white/5 uppercase tracking-wide"
+                onClick={handleCopyRekening}
+                className="text-white/60 hover:text-white flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10"
               >
-                Batal
+                {copiedRekening ? (
+                  <>
+                    <Check size={11} className="text-emerald-400" />
+                    <span className="text-emerald-400">Tersalin</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={11} />
+                    <span>Salin</span>
+                  </>
+                )}
               </button>
-
-              {commonStatus === 'pending' && (
-                <button
-                  type="button"
-                  onClick={handleBulkProcess}
-                  className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-400 text-black px-3.5 py-2 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-yellow-500/10 uppercase tracking-wider"
-                >
-                  <Play size={12} fill="currentColor" />
-                  <span>Proses</span>
-                </button>
-              )}
-
-              {commonStatus === 'processing' && (
-                <button
-                  type="button"
-                  onClick={() => setShowBulkPaymentModal(selectedRequests)}
-                  className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-400 text-white px-3.5 py-2 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-orange-500/10 uppercase tracking-wider"
-                >
-                  <Send size={12} />
-                  <span>Ajukan Bayar</span>
-                </button>
-              )}
-
-              {commonStatus === 'awaiting_payment' && (
-                <button
-                  type="button"
-                  onClick={handleBulkApprovePayment}
-                  className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-400 text-white px-3.5 py-2 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-purple-500/10 uppercase tracking-wider"
-                >
-                  <CheckCircle2 size={12} />
-                  <span>Approve Bayar</span>
-                </button>
-              )}
-
-              {commonStatus === 'paid' && (
-                <button
-                  type="button"
-                  onClick={handleBulkShip}
-                  className="flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-400 text-white px-3.5 py-2 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-indigo-500/10 uppercase tracking-wider"
-                >
-                  <Truck size={12} />
-                  <span>Kirim Barang</span>
-                </button>
-              )}
             </div>
-          </motion.div>
-        )}
+            <div className="font-mono text-xl sm:text-2xl font-bold tracking-[0.16em] text-white text-shadow-sm select-all">
+              {formatCardDigits(primaryBank.noRekening)}
+            </div>
+          </div>
 
-        {showMainMaterialModal && (
-          <MainMaterialModal 
-            materials={mainMaterials}
-            onAdd={addMainMaterial}
-            onDelete={deleteMainMaterial}
-            onClose={() => setShowMainMaterialModal(false)}
-          />
-        )}
-        {showPaymentModal && (
-          <PaymentModal 
-            request={showPaymentModal} 
-            locationName={subs.find(s => s.id === showPaymentModal.subId)?.name || ''}
-            onClose={() => setShowPaymentModal(null)}
-            onConfirm={(requestId) => {
-              updateRequestStatus(requestId, 'awaiting_payment');
-              setShowPaymentModal(null);
-            }}
-            onSkip={(requestId) => {
-              updateRequestStatus(requestId, 'paid');
-              setShowPaymentModal(null);
-            }}
-          />
-        )}
-        {showBulkPaymentModal && (
-          <BulkPaymentModal 
-            requests={showBulkPaymentModal}
-            subs={subs}
-            profiles={profiles}
-            onClose={() => setShowBulkPaymentModal(null)}
-            onConfirm={(ids) => {
-              ids.forEach(id => updateRequestStatus(id, 'awaiting_payment'));
-              setShowBulkPaymentModal(null);
-              setSelectedItemIds([]);
-            }}
-            onSkip={(ids) => {
-              ids.forEach(id => updateRequestStatus(id, 'paid'));
-              setShowBulkPaymentModal(null);
-              setSelectedItemIds([]);
-            }}
-          />
-        )}
+          {/* Bottom Row: (Nama) & (Nomor Hp) */}
+          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/10 mt-4">
+            {/* Nama Penerima A/N */}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-white/50 mb-0.5">
+                <User size={12} className="text-white/60" />
+                <span>Penerima A/N</span>
+              </div>
+              <p className="text-sm sm:text-base font-semibold text-white tracking-tight truncate">
+                {currentCard.nama || '-'}
+              </p>
+            </div>
 
-        {selectedStatusDetail && (() => {
-          const sub = subs.find(s => s.id === selectedStatusDetail.subId);
-          const profile = profiles.find(p => p.id === sub?.profileId);
-          const status = selectedStatusDetail.status;
-          
-          const title = profile && sub ? `${profile.name} - ${sub.name}` : "Lokasi";
-          
-          // Filter requests matching this sub and status
-          const filteredReqs = requests.filter(r => r.subId === selectedStatusDetail.subId && r.status === status);
-          const hexColor = getStatusHexColor(status);
-          const theme = getRequestTheme(status);
+            {/* Nomor HP Vendor */}
+            <div className="min-w-0 text-right">
+              <div className="flex items-center justify-end gap-1 text-[10px] uppercase font-bold tracking-wider text-white/50 mb-0.5">
+                <Phone size={12} className="text-white/60" />
+                <span>Nomor HP</span>
+              </div>
+              <p className="text-sm sm:text-base font-semibold text-amber-200/90 tracking-tight font-mono truncate">
+                {currentCard.nomorHp || '-'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          return (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-              <motion.div
-                key="status-popup"
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="bg-zinc-950 border border-white/10 w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-[75vh]"
+      {/* 2. DETAIL PEMBAYARAN (Inputs Lokasi & Item - Tanpa Bar Pilihan) */}
+      <div className="bg-zinc-900/70 border border-white/10 rounded-2xl p-5 mb-5 backdrop-blur-md shadow-lg">
+        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/10">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <Package size={16} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+              Detail Pembayaran
+            </h3>
+            <p className="text-[11px] text-white/40">
+              Input lokasi dan item material untuk nota pembayaran
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Input 1: Lokasi : */}
+          <div>
+            <label className="block text-xs font-semibold text-white/70 mb-1.5 flex items-center gap-1.5">
+              <MapPin size={14} className="text-emerald-400" />
+              <span>Lokasi :</span>
+            </label>
+            <input
+              type="text"
+              value={lokasi}
+              onChange={(e) => setLokasi(e.target.value)}
+              placeholder="Masukkan lokasi (contoh: Workshop)"
+              className="w-full px-3.5 py-2.5 bg-black/50 border border-white/15 focus:border-emerald-500 rounded-xl text-white placeholder-white/25 text-sm focus:outline-none transition-colors"
+            />
+          </div>
+
+          {/* Input 2: Item */}
+          <div>
+            <label className="block text-xs font-semibold text-white/70 mb-1.5 flex items-center gap-1.5">
+              <Package size={14} className="text-amber-400" />
+              <span>Item :</span>
+            </label>
+            <input
+              type="text"
+              value={item}
+              onChange={(e) => setItem(e.target.value)}
+              placeholder="Masukkan item material (contoh: Pasir)"
+              className="w-full px-3.5 py-2.5 bg-black/50 border border-white/15 focus:border-emerald-500 rounded-xl text-white placeholder-white/25 text-sm focus:outline-none transition-colors"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. TOMBOL DIRECT KE WHATSAPP (Buka WA & Pilih Kontak) */}
+      <div className="space-y-3 mb-6">
+        <button
+          onClick={handleDirectWa}
+          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-base shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-3 transition-all duration-200 transform active:scale-[0.98] cursor-pointer"
+        >
+          <MessageCircle size={22} className="fill-white/20" />
+          <span>Kirim Pesan ke WhatsApp</span>
+        </button>
+
+        <button
+          onClick={handleCopyCaption}
+          className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+        >
+          {copied ? (
+            <>
+              <Check size={16} className="text-emerald-400" />
+              <span className="text-emerald-400">Format Caption Berhasil Disalin!</span>
+            </>
+          ) : (
+            <>
+              <Copy size={16} />
+              <span>Salin Format Caption WA</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* 4. PREVIEW CAPTION WA (Semua Bank Dimasukkan) */}
+      <div className="bg-black/60 border border-white/10 rounded-2xl p-4 mb-6">
+        <div className="flex items-center justify-between text-xs text-white/50 mb-2 font-mono">
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Live Preview Format WA:
+          </span>
+          <span className="text-[10px] text-white/40">
+            {currentCard.bankAccounts?.length || 1} Bank Terdaftar
+          </span>
+        </div>
+        <div className="p-3.5 bg-zinc-950/90 border border-emerald-500/20 rounded-xl font-mono text-xs sm:text-sm text-emerald-300/90 whitespace-pre-wrap leading-relaxed shadow-inner">
+          {currentWaMessage}
+        </div>
+      </div>
+
+      {/* 5. RIWAYAT PELAPORAN (If available) */}
+      <AnimatePresence>
+        {showHistory && history.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="bg-zinc-900/80 border border-white/10 rounded-2xl p-4 mb-6 backdrop-blur-md"
+          >
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <History size={14} className="text-white/60" /> Riwayat Pelaporan Nota
+              </h4>
+              <button
+                onClick={() => setHistory([])}
+                className="text-[11px] text-red-400 hover:text-red-300"
               >
-                {/* Header of detailed popup */}
-                <div className="p-6 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/[0.02]">
+                Hapus Riwayat
+              </button>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+              {history.map((h) => (
+                <div
+                  key={h.id}
+                  className="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between text-xs"
+                >
                   <div>
-                    <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Daftar Permintaan</h3>
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: hexColor, boxShadow: `0 0 10px ${hexColor}80` }} />
-                      <h2 className="text-base font-black text-white tracking-tight leading-none uppercase">
-                        {getStatusLabel(status)} ({filteredReqs.length})
-                      </h2>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white">{h.item}</span>
+                      <span className="text-white/40">•</span>
+                      <span className="text-emerald-400 font-medium">{h.lokasi}</span>
                     </div>
-                    <p className="text-[11px] font-bold text-white/60 uppercase tracking-[0.05em] mt-2">
-                      Lokasi: {title}
+                    <p className="text-[11px] text-white/50 mt-0.5">
+                      {h.vendorNama} ({h.bankAccounts?.[0]?.bank} - {h.bankAccounts?.[0]?.noRekening}) • {h.timestamp}
                     </p>
                   </div>
-                  <button 
-                    onClick={() => setSelectedStatusDetail(null)} 
-                    className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:text-white transition-all hover:bg-white/10 shadow-lg"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {/* Filtered items list */}
-                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-4">
-                  {filteredReqs.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center p-12 opacity-30 h-full">
-                      <Package size={48} strokeWidth={1} className="text-white" />
-                      <p className="mt-4 text-xs font-black uppercase tracking-widest text-white">Tidak ada material berstatus ini</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {filteredReqs.map((req) => {
-                        const isChecked = selectedItemIds.includes(req.id);
-                        return (
-                          <div key={req.id} className="flex items-center gap-3 w-full">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (isChecked) {
-                                  setSelectedItemIds(prev => prev.filter(id => id !== req.id));
-                                } else {
-                                  setSelectedItemIds(prev => [...prev, req.id]);
-                                }
-                              }}
-                              className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                                isChecked 
-                                  ? 'bg-white border-white text-black shadow-lg shadow-white/20 scale-105' 
-                                  : 'border-white/20 bg-white/5 hover:border-white/45'
-                              }`}
-                              title="Pilih Item"
-                            >
-                              {isChecked && <Check size={14} strokeWidth={4} />}
-                            </button>
-                            <div className="flex-1 min-w-0">
-                              <RequestItem 
-                                request={req} 
-                                onStatusUpdate={updateRequestStatus} 
-                                onApproveEdit={approveEdit} 
-                                onRejectEdit={rejectEdit} 
-                                onRequestPayment={setShowPaymentModal} 
-                                locationName={title}
-                                theme={theme}
-                                statusLabel={getStatusLabel(req.status)}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </div>
-          );
-        })()}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function MainMaterialModal({ materials, onAdd, onDelete, onClose }: { 
-  materials: any[]; 
-  onAdd: (n: string, u: string) => void; 
-  onDelete: (id: string) => void;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [unit, setUnit] = useState('zak');
-  const UNITS = ['zak', 'ret', 'dus', 'Pcs', 'galon', 'm2', 'm3', 'Liter', 'Roll', 'Lembar', 'Kaleng', 'Dll'];
-
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ y: 50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 50, opacity: 0 }}
-        className="bg-black/95 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-6 shadow-2xl relative border border-white/10 flex flex-col"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-base font-black text-white uppercase tracking-tight">Daftar Material</h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white/40 hover:text-white">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="space-y-4 mb-6">
-           <div className="flex gap-2">
-              <div className="flex-1">
-                 <input 
-                  type="text" 
-                  placeholder="Nama..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs font-black text-white focus:bg-white/10 outline-none"
-                  value={name}
-                  onBlur={e => setName(toTitleCase(e.target.value))}
-                  onChange={e => handleTitleCaseChange(e, (val) => setName(val))}
-                  onKeyDown={handleEnterNextField}
-                 />
-              </div>
-              <div className="w-24">
-                 <input 
-                  type="text"
-                  placeholder="Satuan"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-2 py-2.5 text-xs font-black text-white focus:bg-white/10 outline-none text-center"
-                  onKeyDown={handleEnterNextField}
-                  onBlur={e => setUnit(toTitleCase(e.target.value))}
-                  value={unit}
-                  onChange={e => handleTitleCaseChange(e, (val) => setUnit(val))}
-                 />
-              </div>
-              <button 
-                disabled={!name}
-                onClick={() => {
-                  onAdd(name, unit);
-                  setName('');
-                }}
-                className="bg-white text-black px-3.5 py-2.5 rounded-xl font-black text-xs disabled:opacity-30 active:scale-95 transition-all shadow-lg"
-              >
-                <Plus size={18} strokeWidth={4} />
-              </button>
-           </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar border-t border-white/5 pt-4 space-y-2">
-           {materials.length === 0 ? (
-             <p className="text-center text-[10px] text-white/30 italic py-8 uppercase font-black">Belum ada material.</p>
-           ) : (
-             materials.map(m => (
-               <div key={m.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl shadow-sm hover:shadow-md transition-all group">
-                  <div>
-                     <p className="text-xs font-black text-white uppercase">{m.name}</p>
-                     <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{m.unit}</p>
-                  </div>
-                  <button 
+                  <button
                     onClick={() => {
-                      if (window.confirm(`Hapus material "${m.name}"?`)) {
-                        onDelete(m.id);
-                      }
+                      setItem(h.item);
+                      setLokasi(h.lokasi);
                     }}
-                    className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white"
+                    title="Gunakan item & lokasi ini"
                   >
-                     <Trash2 size={14} />
+                    <RotateCcw size={13} />
                   </button>
-               </div>
-             ))
-           )}
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-const RequestItem: React.FC<{ 
-  request: MaterialRequest; 
-  onStatusUpdate: (id: string, s: RequestStatus) => void;
-  onApproveEdit: (id: string) => void;
-  onRejectEdit: (id: string) => void;
-  onRequestPayment: (req: MaterialRequest) => void;
-  onDelete?: (id: string) => void;
-  locationName: string;
-  theme: any;
-  statusLabel: string;
-}> = ({ 
-  request, 
-  onStatusUpdate, 
-  onApproveEdit,
-  onRejectEdit,
-  onRequestPayment,
-  onDelete,
-  locationName,
-  theme,
-  statusLabel
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const getStatusColor = (status: RequestStatus) => {
-    switch (status) {
-      case 'pending': return 'text-ig-grey';
-      case 'processing': return 'text-amber-500';
-      case 'awaiting_payment': return 'text-ig-blue font-bold';
-      case 'paid': return 'text-green-600 font-bold';
-      case 'delivered': return 'text-ig-blue font-bold italic';
-      case 'on_hold': return 'text-red-500';
-      default: return 'text-ig-grey';
-    }
-  };
-
-  const currentStatusIndex = request.history.length - 1;
-  const currentStatusStartTime = request.history[currentStatusIndex].timestamp;
-
-  const getResumeStatus = (): RequestStatus => {
-    if (request.history.length < 2) return 'pending';
-    for (let i = request.history.length - 2; i >= 0; i--) {
-      if (request.history[i].status !== 'on_hold') return request.history[i].status;
-    }
-    return 'pending';
-  };
-
-  return (
-    <div className={`border border-white/10 rounded-[28px] shadow-2xl transition-all relative overflow-hidden ${theme.bg} mb-4`}>
-      {theme.watermark}
-      <button 
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-5 flex items-center justify-between text-left relative z-10"
-      >
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-sm ${theme.text}`}>
-            {request.status === 'delivered' ? <Truck size={18} /> : 
-             request.status === 'processing' ? <RefreshCw size={18} /> :
-             request.status === 'awaiting_payment' ? <Wallet size={18} /> :
-             request.status === 'paid' ? <CheckCircle2 size={18} /> :
-             <Package size={18} />}
-          </div>
-          <div>
-            <p className={`text-sm font-black tracking-tight ${theme.text}`}>{request.materialName}</p>
-            <StatusTimer status={request.status} startTime={currentStatusStartTime} theme={theme} statusLabel={statusLabel} />
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {request.pendingEdit && <div className="w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_10px_white] animate-pulse" />}
-          <div className={`transition-transform ${theme.text} opacity-60 ${isExpanded ? 'rotate-90' : ''}`}>
-             <ChevronRight size={18} />
-          </div>
-        </div>
-      </button>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="px-4 pb-4 space-y-4 relative z-10"
-          >
-            {request.pendingEdit && (
-              <div className="p-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl space-y-3">
-                <div className="flex items-center gap-2 text-white">
-                  <AlertTriangle size={16} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Ada Revisi Dari Site Manager</span>
                 </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                   <div className="text-[9px] text-white/70 font-bold uppercase">Nama: <span className="font-black text-white">{request.pendingEdit.materialName}</span></div>
-                   <div className="text-[9px] text-white/70 font-bold uppercase">Jumlah: <span className="font-black text-white">{request.pendingEdit.quantity} {request.pendingEdit.unit}</span></div>
-                   <div className="text-[9px] text-white/70 font-bold uppercase">Deadline: <span className="font-black text-white">{new Date(request.pendingEdit.dateNeeded).toLocaleDateString()}</span></div>
-                </div>
-                <div className="flex gap-2 pt-2">
-                   <button 
-                    onClick={(e) => { e.stopPropagation(); onApproveEdit(request.id); }}
-                    className="flex-1 bg-white text-ig-black py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg active:scale-95 transition-all"
-                   >
-                     SETUJUI REVISI
-                   </button>
-                   <button 
-                    onClick={(e) => { e.stopPropagation(); onRejectEdit(request.id); }}
-                    className="flex-1 bg-white/10 text-white border border-white/30 py-2.5 rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all"
-                   >
-                     TOLAK
-                   </button>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3 p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-              <div className="space-y-1">
-                <p className={`text-[9px] font-black uppercase tracking-widest ${theme.text} opacity-70`}>Volume</p>
-                <p className={`text-sm font-black italic ${theme.text}`}>{request.quantity} {request.unit.toUpperCase()}</p>
-              </div>
-              <div className="space-y-1 text-right">
-                <p className={`text-[9px] font-black uppercase tracking-widest ${theme.text} opacity-70`}>Batas Waktu</p>
-                <p className={`text-sm font-black ${theme.text}`}>{new Date(request.dateNeeded).toLocaleDateString()}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 pt-2">
-              <div className="flex items-center gap-2">
-                {request.status === 'pending' && (
-                  <ActionButton 
-                    label="PROSES SEKARANG" 
-                    icon={<Play size={14} fill="currentColor" />} 
-                    onClick={() => onStatusUpdate(request.id, 'processing')}
-                    className="flex-1 bg-white text-amber-500 shadow-xl" 
-                  />
-                )}
-                {request.status === 'processing' && (
-                  <ActionButton 
-                    label="AJUKAN PEMBAYARAN" 
-                    icon={<Send size={14} />} 
-                    onClick={() => onRequestPayment(request)}
-                    className="flex-1 bg-white text-orange-600 shadow-xl" 
-                  />
-                )}
-                {request.status === 'paid' && (
-                  <ActionButton 
-                    label="PENGIRIMAN BARANG" 
-                    icon={<Truck size={16} />} 
-                    onClick={() => onStatusUpdate(request.id, 'delivered')}
-                    className="flex-1 bg-white text-indigo-600 shadow-xl" 
-                  />
-                )}
-                {request.status === 'delivered' && (
-                    <div className="flex-1 h-12 flex items-center justify-center gap-2 text-[11px] font-black text-white bg-white/10 border border-white/30 rounded-xl italic">
-                        <Truck size={14} /> DALAM PERJALANAN...
-                    </div>
-                )}
-                {request.status === 'awaiting_payment' && (
-                  <div className="flex-1 flex gap-2">
-                    <div className="flex-1 h-12 flex items-center justify-center gap-2 text-[10px] font-black text-white/60 bg-white/5 border border-white/10 rounded-xl italic px-2">
-                        <Wallet size={12} /> MENUNGGU FINANCE
-                    </div>
-                    <ActionButton 
-                      label="APPROVE PEMBAYARAN" 
-                      icon={<CheckCircle2 size={14} />} 
-                      onClick={() => onStatusUpdate(request.id, 'paid')}
-                      className="flex-[2] bg-white text-indigo-600 shadow-xl" 
-                    />
-                  </div>
-                )}
-
-                {['pending', 'processing', 'awaiting_payment', 'paid'].includes(request.status) ? (
-                  <ActionButton 
-                    label="HOLD" 
-                    icon={<Pause size={14} />} 
-                    onClick={() => onStatusUpdate(request.id, 'on_hold')}
-                    className="bg-white/10 text-white w-20 border border-white/30" 
-                  />
-                ) : request.status === 'on_hold' ? (
-                  <ActionButton 
-                    label="LANJUTKAN PROSES" 
-                    icon={<Play size={14} fill="currentColor" />} 
-                    onClick={() => onStatusUpdate(request.id, getResumeStatus())}
-                    className="flex-1 bg-white text-red-500 shadow-xl" 
-                  />
-                ) : null}
-                
-                {onDelete && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); onDelete(request.id); }}
-                    className="w-12 h-12 flex items-center justify-center bg-white/10 text-white border border-white/30 rounded-xl active:scale-95 transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
+              ))}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-};
 
-function PaymentModal({ request, locationName, onClose, onConfirm, onSkip }: { 
-  request: MaterialRequest; 
-  locationName: string;
-  onClose: () => void; 
-  onConfirm: (id: string) => void;
-  onSkip: (id: string) => void;
-}) {
-
-  const [form, setForm] = useState({
-    location: locationName,
-    accountName: '',
-    accountNumber: '',
-    bank: ''
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const message = `Lokasi : ${form.location}\nNama : ${form.accountName}\nNo Rekening : ${form.accountNumber}\nBank : ${form.bank}\n\nBismillah Saya Telah Mengorder *${request.materialName}* Mohon Lakukan Pembayaran Bu Terima Kasih`;
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
-    onConfirm(request.id);
-  };
-
-  return (
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-[200] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ y: 50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 50, opacity: 0 }}
-        className="bg-white/10 backdrop-blur-xl w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/20"
-      >
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h3 className="text-xl font-black text-white tracking-tight uppercase">Payment Req</h3>
-            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-1">Konfirmasi Pembayaran</p>
-          </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white border border-white/10 shadow-lg">
-            <X size={20} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-1.5">
-            <label className="text-[8px] font-black text-white/50 uppercase tracking-widest ml-1">Lokasi</label>
-            <input 
-              readOnly
-              type="text" 
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3.5 text-sm font-black text-white/50"
-              value={form.location}
+      {/* POPUP 1: GANTI KARTU & KELOLA KATEGORI */}
+      <AnimatePresence>
+        {isSelectorModalOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSelectorModalOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[120]"
             />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Atas Nama Rekening</label>
-            <input 
-              required
-              type="text" 
-              placeholder="..."
-              className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
-              onKeyDown={handleEnterNextField}
-              onBlur={e => setForm({...form, accountName: toTitleCase(e.target.value)})}
-              value={form.accountName}
-              onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, accountName: val}))}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">No. Rekening</label>
-              <input 
-                required
-                type="text" 
-                placeholder="000"
-                className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
-                onKeyDown={handleEnterNextField}
-                value={form.accountNumber}
-                onChange={e => setForm({...form, accountNumber: e.target.value})}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Bank</label>
-              <input 
-                required
-                type="text" 
-                placeholder="BCA/BRI"
-                className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
-                onKeyDown={handleEnterNextField}
-                onBlur={e => setForm({...form, bank: toTitleCase(e.target.value)})}
-                value={form.bank}
-                onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, bank: val}))}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 pt-2">
-            <button 
-              type="submit"
-              className="w-full bg-[#25D366] text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest"
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[94%] max-w-lg bg-zinc-950 border border-white/20 rounded-3xl p-5 sm:p-6 z-[130] shadow-2xl flex flex-col max-h-[88vh]"
             >
-              <Send size={18} fill="currentColor" />
-              Kirim WhatsApp
-            </button>
-            <button 
-              type="button"
-              onClick={() => onSkip(request.id)}
-              className="w-full bg-white/5 border border-white/10 hover:bg-white/15 text-white py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all active:scale-95 uppercase tracking-widest"
-            >
-              Skip WA (Langsung Berhasil)
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </div>
-  );
-}
-
-function StatusTimer({ status, startTime, theme, statusLabel }: { status: RequestStatus, startTime: number, theme: any, statusLabel: string }) {
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    if (status === 'on_hold') return; 
-
-    setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [startTime, status]);
-
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  return (
-    <div className="flex items-center gap-2 mt-0.5">
-      <span className={`text-[9px] font-black uppercase tracking-widest ${theme.text}`}>
-        {statusLabel}
-      </span>
-      <span className={`${theme.text} opacity-30 text-[8px]`}>|</span>
-      <span className={`text-[10px] font-bold tracking-tight ${theme.text} opacity-80`}>
-        {status === 'on_hold' ? 'TERKUNCI' : formatTime(elapsed)}
-      </span>
-    </div>
-  );
-}
-
-function ActionButton({ label, icon, onClick, className }: { label: string, icon: React.ReactNode, onClick: () => void, className: string }) {
-  return (
-    <button 
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 ${className}`}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
-function BulkPaymentModal({ 
-  requests, 
-  subs, 
-  profiles, 
-  onClose, 
-  onConfirm,
-  onSkip
-}: { 
-  requests: MaterialRequest[]; 
-  subs: any[];
-  profiles: any[];
-  onClose: () => void; 
-  onConfirm: (ids: string[]) => void;
-  onSkip: (ids: string[]) => void;
-}) {
-
-  const [form, setForm] = useState({
-    accountName: '',
-    accountNumber: '',
-    bank: ''
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // 1. Get unique location names
-    const uniqueLocations = Array.from(new Set(requests.map(r => {
-      const s = subs.find(sub => sub.id === r.subId);
-      const p = profiles.find(profile => profile.id === s?.profileId);
-      return p && s ? `${p.name} - ${s.name}` : '';
-    }).filter(Boolean)));
-    const locationText = uniqueLocations.join(', ');
-
-    // 2. Generate items text list without name & location in each item
-    const itemsText = requests.map((req, idx) => {
-      return `${idx + 1}. ${req.materialName} (${req.quantity} ${req.unit})`;
-    }).join('\n');
-
-    // 3. Format message exactly as the user specified:
-    // Lokasi : Pak Budiman (PM Wilayah Barat) - Cluster Anggrek - Blok A
-    // Atas Nama Rekening : Kiku
-    // No. Rekening : 230230
-    // Bank : Bca
-    // 
-    // Bismillah Saya Telah Mengorder:
-    // 1. Semen (Holcim) (50 sak)
-    // 2. Besi Beton 12mm (120 batang)
-    // 
-    // Mohon Lakukan Pembayaran Bu Terima Kasih
-    const message = `Lokasi : ${locationText}
-Atas Nama Rekening : ${form.accountName}
-No. Rekening : ${form.accountNumber}
-Bank : ${form.bank}
-
-Bismillah Saya Telah Mengorder:
-${itemsText}
-
-Mohon Lakukan Pembayaran Bu Terima Kasih`;
-
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
-    onConfirm(requests.map(r => r.id));
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ y: 50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 50, opacity: 0 }}
-        className="bg-zinc-900 w-full max-w-sm rounded-[32px] p-8 shadow-2xl relative border border-white/10"
-      >
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h3 className="text-xl font-black text-white tracking-tight uppercase">Bulk Payment</h3>
-            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-1">Konfirmasi Pembayaran Kolektif</p>
-          </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-white border border-white/10 shadow-lg">
-            <X size={20} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-1.5">
-            <label className="text-[8px] font-black text-white/50 uppercase tracking-widest ml-1">Lokasi Gabungan</label>
-            <div className="max-h-20 overflow-y-auto w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs font-bold text-white/70">
-              {requests.map((r, idx) => {
-                const s = subs.find(sub => sub.id === r.subId);
-                const p = profiles.find(profile => profile.id === s?.profileId);
-                return (
-                  <div key={idx} className="truncate">
-                    • {p?.name} - {s?.name}
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <Layers size={18} />
                   </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Atas Nama Rekening</label>
-            <input 
-              required
-              type="text" 
-              placeholder="..."
-              className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
-              onKeyDown={handleEnterNextField}
-              onBlur={e => setForm({...form, accountName: toTitleCase(e.target.value)})}
-              value={form.accountName}
-              onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, accountName: val}))}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">No. Rekening</label>
-              <input 
-                required
-                type="text" 
-                placeholder="000"
-                className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
-                onKeyDown={handleEnterNextField}
-                value={form.accountNumber}
-                onChange={e => setForm({...form, accountNumber: e.target.value})}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[8px] font-black text-white/70 uppercase tracking-widest ml-1">Bank</label>
-              <input 
-                required
-                type="text" 
-                placeholder="BCA/BRI"
-                className="w-full bg-white/5 border border-white/20 rounded-2xl px-4 py-3.5 text-sm font-black text-white focus:bg-white/10 outline-none placeholder:text-white/20 shadow-inner"
-                onKeyDown={handleEnterNextField}
-                onBlur={e => setForm({...form, bank: toTitleCase(e.target.value)})}
-                value={form.bank}
-                onChange={e => handleTitleCaseChange(e, (val) => setForm({...form, bank: val}))}
-              />
-            </div>
-          </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white tracking-tight">
+                      Pilih & Kelola Kartu Vendor
+                    </h3>
+                    <p className="text-[11px] text-white/50">
+                      Kelompokkan kartu berdasarkan kategori
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsSelectorModalOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-          <div className="flex flex-col gap-2 pt-2">
-            <button 
-              type="submit"
-              className="w-full bg-[#25D366] text-white py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all uppercase tracking-widest"
+              {/* Kategori Bar (Tabs + Buat Kategori Manual) */}
+              <div className="py-3 border-b border-white/10 shrink-0">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider flex items-center gap-1">
+                    <Tag size={12} className="text-amber-400" /> Kategori Vendor
+                  </span>
+                  <button
+                    onClick={() => setIsAddingCategory(!isAddingCategory)}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
+                  >
+                    <FolderPlus size={13} /> + Kategori Baru
+                  </button>
+                </div>
+
+                {/* Inline form to add category manually */}
+                {isAddingCategory && (
+                  <form onSubmit={handleAddCategory} className="flex gap-2 mb-2.5">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Nama kategori baru..."
+                      className="flex-1 px-3 py-1.5 bg-black/60 border border-emerald-500/50 rounded-xl text-white text-xs focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl"
+                    >
+                      Tambah
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingCategory(false)}
+                      className="px-2 py-1.5 bg-white/10 hover:bg-white/15 text-white text-xs rounded-xl"
+                    >
+                      Batal
+                    </button>
+                  </form>
+                )}
+
+                {/* Category Pills list */}
+                <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
+                  <button
+                    onClick={() => setSelectedCategoryFilter('Semua')}
+                    className={`text-xs px-3 py-1.5 rounded-xl border whitespace-nowrap font-medium transition-all ${
+                      selectedCategoryFilter === 'Semua'
+                        ? 'bg-amber-400 text-black border-amber-400 font-bold shadow-sm'
+                        : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                    }`}
+                  >
+                    Semua ({cards.length})
+                  </button>
+                  {categories.map((cat) => {
+                    const count = cards.filter(c => c.kategori === cat).length;
+                    return (
+                      <div key={cat} className="flex items-center shrink-0">
+                        <button
+                          onClick={() => setSelectedCategoryFilter(cat)}
+                          className={`text-xs px-3 py-1.5 rounded-l-xl border-y border-l whitespace-nowrap font-medium transition-all ${
+                            selectedCategoryFilter === cat
+                              ? 'bg-amber-400 text-black border-amber-400 font-bold shadow-sm'
+                              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                          }`}
+                        >
+                          {cat} ({count})
+                        </button>
+                        {categories.length > 1 && (
+                          <button
+                            onClick={(e) => handleDeleteCategory(cat, e)}
+                            className={`text-xs px-1.5 py-1.5 rounded-r-xl border-y border-r transition-all ${
+                              selectedCategoryFilter === cat
+                                ? 'bg-amber-400 text-black/60 hover:text-black border-amber-400'
+                                : 'bg-white/5 border-white/10 text-white/30 hover:text-red-400'
+                            }`}
+                            title={`Hapus kategori ${cat}`}
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Cards List */}
+              <div className="flex-1 overflow-y-auto py-3 space-y-2.5 custom-scrollbar min-h-[160px]">
+                {filteredCards.length === 0 ? (
+                  <div className="text-center py-8 text-white/40 text-xs">
+                    <Store size={28} className="mx-auto mb-2 text-white/20" />
+                    <p>Belum ada kartu di kategori ini.</p>
+                    <button
+                      onClick={() => handleOpenCreateModal(selectedCategoryFilter)}
+                      className="mt-2 text-amber-400 hover:text-amber-300 font-semibold"
+                    >
+                      + Tambah kartu sekarang
+                    </button>
+                  </div>
+                ) : (
+                  filteredCards.map((card) => {
+                    const isActive = card.id === activeCardId;
+                    const primary = card.bankAccounts?.[0] || { bank: 'BRI', noRekening: '-' };
+                    const extraBanksCount = (card.bankAccounts?.length || 1) - 1;
+
+                    return (
+                      <div
+                        key={card.id}
+                        onClick={() => {
+                          setActiveCardId(card.id);
+                          setIsSelectorModalOpen(false);
+                        }}
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative ${
+                          isActive
+                            ? 'bg-emerald-500/10 border-emerald-500/60 shadow-lg shadow-emerald-500/10'
+                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            {/* Category & Store */}
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-amber-300 uppercase tracking-wider">
+                                {card.kategori || 'Umum'}
+                              </span>
+                              {isActive && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                                  <CheckCircle2 size={10} /> Aktif
+                                </span>
+                              )}
+                            </div>
+
+                            <h4 className="text-sm font-bold text-white truncate">
+                              {card.namaToko}
+                            </h4>
+
+                            <p className="text-xs text-white/60 mt-0.5">
+                              A/N: <strong className="text-white/80">{card.nama}</strong> • HP: {card.nomorHp || '-'}
+                            </p>
+
+                            <div className="mt-2 text-xs font-mono text-emerald-300/90 flex items-center gap-2 flex-wrap">
+                              <span>
+                                {primary.bank}: {primary.noRekening}
+                              </span>
+                              {extraBanksCount > 0 && (
+                                <span className="text-[10px] text-white/50 bg-white/10 px-1.5 py-0.5 rounded font-sans">
+                                  +{extraBanksCount} Bank lain
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Buttons: Edit & Delete */}
+                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => {
+                                handleOpenEditModal(card);
+                              }}
+                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                              title="Edit Kartu"
+                            >
+                              <Edit3 size={15} />
+                            </button>
+                            {cards.length > 1 && (
+                              <button
+                                onClick={(e) => handleDeleteCard(card.id, e)}
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-colors"
+                                title="Hapus Kartu"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Modal Footer: Add Card Button */}
+              <div className="pt-3 border-t border-white/10 shrink-0">
+                <button
+                  onClick={() => handleOpenCreateModal(selectedCategoryFilter)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+                >
+                  <Plus size={16} /> Tambah Kartu Baru
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP 2: EDIT / TAMBAH KARTU (Dengan Input Multi Bank) */}
+      <AnimatePresence>
+        {isEditModalOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsEditModalOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[140]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[94%] max-w-md bg-zinc-950 border border-white/20 rounded-3xl p-5 sm:p-6 z-[150] shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar"
             >
-              <Send size={18} fill="currentColor" />
-              Kirim WhatsApp
-            </button>
-            <button 
-              type="button"
-              onClick={() => onSkip(requests.map(r => r.id))}
-              className="w-full bg-white/5 border border-white/10 hover:bg-white/15 text-white py-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all active:scale-95 uppercase tracking-widest"
-            >
-              Skip WA (Langsung Berhasil)
-            </button>
-          </div>
-        </form>
-      </motion.div>
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <CreditCard size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white tracking-tight">
+                      {isCreatingNewCard ? 'Tambah Kartu Vendor' : 'Edit Data Kartu Display'}
+                    </h3>
+                    <p className="text-[11px] text-white/50">
+                      Bisa input lebih dari 1 bank (masuk ke laporan WA)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Form Content */}
+              <form onSubmit={handleSaveCard} className="space-y-4 text-xs">
+                {/* 1. Kategori Selection */}
+                <div>
+                  <label className="block font-semibold text-white/80 mb-1 flex items-center gap-1.5">
+                    <Tag size={13} className="text-amber-400" />
+                    <span>Kategori Kartu :</span>
+                  </label>
+                  <select
+                    value={editCardData.kategori}
+                    onChange={(e) => setEditCardData({ ...editCardData, kategori: e.target.value })}
+                    className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm focus:outline-none"
+                  >
+                    {categories.map(c => (
+                      <option key={c} value={c} className="bg-zinc-900 text-white">
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Nama Toko/Vendor */}
+                <div>
+                  <label className="block font-semibold text-white/80 mb-1 flex items-center gap-1.5">
+                    <Store size={13} className="text-amber-400" />
+                    <span>Nama Toko / Vendor :</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editCardData.namaToko}
+                    onChange={(e) => setEditCardData({ ...editCardData, namaToko: e.target.value })}
+                    placeholder="Contoh: TB Rusnawati Jaya"
+                    className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm focus:outline-none"
+                  />
+                </div>
+
+                {/* 3. Nama Penerima A/N */}
+                <div>
+                  <label className="block font-semibold text-white/80 mb-1 flex items-center gap-1.5">
+                    <User size={13} className="text-white/60" />
+                    <span>Penerima A/N (Nama) :</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editCardData.nama}
+                    onChange={(e) => setEditCardData({ ...editCardData, nama: e.target.value })}
+                    placeholder="Contoh: Rusnawati"
+                    className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm focus:outline-none"
+                  />
+                </div>
+
+                {/* 4. Nomor HP */}
+                <div>
+                  <label className="block font-semibold text-white/80 mb-1 flex items-center gap-1.5">
+                    <Phone size={13} className="text-emerald-400" />
+                    <span>Nomor HP :</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editCardData.nomorHp}
+                    onChange={(e) => setEditCardData({ ...editCardData, nomorHp: e.target.value })}
+                    placeholder="Contoh: 08111949322"
+                    className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm focus:outline-none font-mono"
+                  />
+                </div>
+
+                {/* 5. MULTIPLE BANK ACCOUNTS */}
+                <div className="pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-[11px]">
+                      <Building2 size={13} className="text-blue-400" />
+                      <span>Daftar Rekening Bank ({editCardData.bankAccounts.length})</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddBankAccount}
+                      className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
+                    >
+                      <Plus size={13} /> + Tambah Bank
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-white/40 mb-3">
+                    Bank pertama akan jadi display di kartu, namun seluruh bank akan masuk ke laporan WA.
+                  </p>
+
+                  <div className="space-y-3">
+                    {editCardData.bankAccounts.map((account, idx) => (
+                      <div 
+                        key={account.id || idx}
+                        className="p-3 rounded-2xl bg-black/50 border border-white/10 relative space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+                            Bank #{idx + 1} {idx === 0 ? '(Utama / Display)' : ''}
+                          </span>
+                          {editCardData.bankAccounts.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBankAccount(idx)}
+                              className="text-white/40 hover:text-red-400 p-1"
+                              title="Hapus Bank Ini"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Bank Name */}
+                        <div>
+                          <input
+                            type="text"
+                            required
+                            value={account.bank}
+                            onChange={(e) => handleUpdateBankAccount(idx, 'bank', e.target.value.toUpperCase())}
+                            placeholder="Nama Bank (BRI, BCA, dll)"
+                            className="w-full px-2.5 py-1.5 bg-black/70 border border-white/15 rounded-lg text-white font-bold uppercase text-xs focus:outline-none focus:border-amber-400"
+                          />
+                          {/* Quick Bank chips */}
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {POPULAR_BANKS.map(b => (
+                              <button
+                                key={b}
+                                type="button"
+                                onClick={() => handleUpdateBankAccount(idx, 'bank', b)}
+                                className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
+                                  account.bank === b
+                                    ? 'bg-blue-500/20 border-blue-500/60 text-blue-300'
+                                    : 'bg-white/5 border-white/10 text-white/50'
+                                }`}
+                              >
+                                {b}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Account Number */}
+                        <div>
+                          <input
+                            type="text"
+                            required
+                            value={account.noRekening}
+                            onChange={(e) => handleUpdateBankAccount(idx, 'noRekening', e.target.value)}
+                            placeholder="Nomor Rekening"
+                            className="w-full px-2.5 py-1.5 bg-black/70 border border-white/15 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit & Cancel */}
+                <div className="flex items-center gap-3 pt-3 mt-4 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold shadow-lg shadow-amber-500/20 transition-all"
+                  >
+                    {isCreatingNewCard ? 'Simpan Kartu' : 'Simpan Perubahan'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

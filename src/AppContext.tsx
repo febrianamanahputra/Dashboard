@@ -557,7 +557,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       if (newStatus === 'awaiting_payment') {
-        addNotification(`Request ${currentReq.materialName} menunggu pembayaran (${subName})`, 'FINANCE', 'info', subName);
+        addNotification(`Request ${currentReq.materialName} menunggu pembayaran (${subName})`, 'SCM', 'info', subName);
       }
       addNotification(`Material ${currentReq.materialName}: ${statusLabels[newStatus]}`, 'SM', 'update', subName);
 
@@ -726,7 +726,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...entry,
         createdAt: Date.now()
       });
-      addNotification(`Dana Lapangan baru diinput: ${entry.notaNo}`, 'FINANCE', 'info');
+      addNotification(`Dana Lapangan baru diinput: ${entry.notaNo}`, 'SM', 'info');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'fieldFunds');
     }

@@ -1663,7 +1663,7 @@ function DeleteSubConfirmModal({
           </div>
           <div>
             <p className="text-[10px] font-black text-white uppercase tracking-[0.2em] leading-none mb-1.5">Hapus Seluruh Data</p>
-            <p className="text-[8px] text-white/30 font-bold uppercase tracking-widest leading-relaxed">Termasuk SCM, Finance, RAP & Stok di lokasi ini.</p>
+            <p className="text-[8px] text-white/30 font-bold uppercase tracking-widest leading-relaxed">Termasuk SCM, RAP & Stok di lokasi ini.</p>
           </div>
         </div>
 

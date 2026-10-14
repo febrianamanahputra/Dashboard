@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../AppContext';
-import { Bell, Heart, X, HardHat, Truck, Wallet, Globe, LogOut, User, ArrowLeft, Send, Trash2 } from 'lucide-react';
+import { Bell, Heart, X, HardHat, Truck, Globe, LogOut, User, ArrowLeft, Send, Trash2 } from 'lucide-react';
 import SMDashboard from './SM/SMDashboard';
 import SCMDashboard from './SCM/SCMDashboard';
-import FinanceDashboard from './Finance/FinanceDashboard';
 import { GoogleSheetsService } from '../services/GoogleSheetsService';
 import { auth } from '../lib/firebase';
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -20,7 +19,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/drive.file'
 ].join(' ');
 
-type Role = 'SM' | 'SCM' | 'FINANCE' | null;
+type Role = 'SM' | 'SCM' | null;
 
 interface NoteItem {
   id: string;
@@ -221,13 +220,6 @@ export default function Layout() {
                   onClick={() => setRole('SCM')}
                   gradient="bg-white/5 hover:bg-white/10"
                 />
-                <RoleAccount 
-                  name="Divisi Finance" 
-                  role=""
-                  icon={<Wallet size={64} className="text-white/5 absolute -right-4 -bottom-4 -rotate-12" />}
-                  onClick={() => setRole('FINANCE')}
-                  gradient="bg-white/5 hover:bg-white/10"
-                />
               </div>
 
               <div className="mt-12 text-center text-white/20 text-[10px] font-bold uppercase tracking-widest">
@@ -251,25 +243,7 @@ export default function Layout() {
               </div>
 
               <div className="flex-1 space-y-2">
-                <SidebarLink 
-                  icon={<Globe size={24} />} 
-                  label="Dashboard" 
-                  active={!showNotifications && !showNotebook}
-                  onClick={() => { setShowNotifications(false); setShowNotebook(false); }}
-                />
-                <SidebarLink 
-                  icon={<Send size={24} className="-rotate-12 text-white" />} 
-                  label="Notebook" 
-                  active={showNotebook}
-                  onClick={() => setShowNotebook(true)}
-                />
-                <SidebarLink 
-                  icon={<Bell size={24} />} 
-                  label="Activity" 
-                  badge={unreadCount > 0}
-                  active={showNotifications}
-                  onClick={() => { setShowNotifications(!showNotifications); setShowNotebook(false); }}
-                />
+                {/* Menu samping dihilangkan sesuai permintaan */}
               </div>
 
               <div className="mt-auto pt-6 border-t border-border-ig">
@@ -300,7 +274,7 @@ export default function Layout() {
                     <ArrowLeft size={24} />
                   </button>
                   <span className="font-bold text-lg tracking-tight text-white">
-                    {role === 'SM' ? 'Divisi Konstruksi' : role === 'SCM' ? 'Divisi SCM' : 'Divisi Finance'}
+                    {role === 'SM' ? 'Divisi Konstruksi' : 'Divisi SCM'}
                   </span>
                 </div>
                 
@@ -339,7 +313,7 @@ export default function Layout() {
                     animate={{ opacity: 1 }}
                     className="h-full"
                   >
-                    {role === 'SM' ? <SMDashboard /> : role === 'SCM' ? <SCMDashboard /> : <FinanceDashboard />}
+                    {role === 'SM' ? <SMDashboard /> : <SCMDashboard />}
                   </motion.div>
                 </div>
               </main>
