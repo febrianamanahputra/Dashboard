@@ -507,18 +507,7 @@ export default function Layout() {
                 )}
               </AnimatePresence>
 
-              {/* Mobile Bottom Navigation (Instagram Style) - Only for SCM as others have their own */}
-              {(role === 'SCM') && (
-                <footer className="lg:hidden h-[50px] border-t border-white/5 flex items-center justify-around bg-black/40 backdrop-blur-md shrink-0">
-                  <button onClick={() => setShowNotifications(false)} className="p-2">
-                    <Globe size={24} className={!showNotifications ? 'text-white' : 'text-white/40'} />
-                  </button>
-                  <button onClick={() => setShowNotifications(true)} className="p-2 relative">
-                    <Bell size={24} className={showNotifications ? 'text-white' : 'text-white/40'} />
-                    {unreadCount > 0 && <span className="absolute top-2 right-2 w-[8px] h-[8px] bg-red-500 rounded-full border border-black" />}
-                  </button>
-                </footer>
-              )}
+
             </div>
           </div>
 

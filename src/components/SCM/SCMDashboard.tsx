@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   CreditCard, 
@@ -22,7 +22,10 @@ import {
   Camera,
   ArrowLeftRight,
   Search,
-  ChevronDown
+  ChevronDown,
+  Paperclip,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { CharacterAvatar, CHARACTERS } from './CharacterAvatars';
 
@@ -258,8 +261,40 @@ Lokasi :${loc || '-'}`;
     setTimeout(() => setCopiedRekening(false), 2000);
   };
 
-  // Direct to WhatsApp after detail input
-  const handleConfirmDirectWa = () => {
+  // Receipt Photo State & Refs (Foto Bukti / Nota Pembayaran)
+  const [receiptPhoto, setReceiptPhoto] = useState<File | null>(null);
+  const [receiptPhotoPreview, setReceiptPhotoPreview] = useState<string | null>(null);
+  const [isSharingPhoto, setIsSharingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (receiptPhotoPreview) {
+        URL.revokeObjectURL(receiptPhotoPreview);
+      }
+      setReceiptPhoto(file);
+      const url = URL.createObjectURL(file);
+      setReceiptPhotoPreview(url);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setReceiptPhoto(null);
+    if (receiptPhotoPreview) {
+      URL.revokeObjectURL(receiptPhotoPreview);
+    }
+    setReceiptPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+  };
+
+  // Direct to WhatsApp after detail input (Supports sending along with receipt photo via Web Share API)
+  const handleConfirmDirectWa = async () => {
+    const caption = buildWaCaption(currentCard, lokasi, item);
+    setIsSharingPhoto(true);
+
     const newEntry: ReportHistory = {
       id: Date.now().toString(),
       timestamp: new Date().toLocaleString('id-ID', { 
@@ -275,11 +310,41 @@ Lokasi :${loc || '-'}`;
     };
     setHistory(prev => [newEntry, ...prev.slice(0, 19)]);
 
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(currentWaMessage)}`;
+    // 1. Mobile Native Web Share API (Android Chrome & iOS Safari support files + text)
+    if (receiptPhoto && navigator.canShare && navigator.canShare({ files: [receiptPhoto] })) {
+      try {
+        await navigator.share({
+          files: [receiptPhoto],
+          text: caption,
+          title: `Nota Pembayaran - ${item || 'Material'}`
+        });
+        setIsSharingPhoto(false);
+        setIsPaymentDetailModalOpen(false);
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          // User closed the share sheet
+          setIsSharingPhoto(false);
+          return;
+        }
+        console.warn('Web Share failed or cancelled, falling back to direct URL', err);
+      }
+    }
+
+    // 2. Direct WhatsApp URL fallback (e.g. desktop browsers or when share isn't supported)
+    // Automatically copy caption to clipboard so user can paste it immediately
+    try {
+      await navigator.clipboard.writeText(caption);
+    } catch (e) {
+      console.warn('Clipboard write failed', e);
+    }
+
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(caption)}`;
     const win = window.open(waUrl, '_blank');
     if (!win) {
       window.location.href = waUrl;
     }
+    setIsSharingPhoto(false);
     setIsPaymentDetailModalOpen(false);
   };
 
@@ -573,21 +638,7 @@ Lokasi :${loc || '-'}`;
         </button>
       </div>
 
-      {/* 3. PREVIEW CAPTION WA (Live Preview Sesuai Format Baru) */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5 shadow-xs">
-        <div className="flex items-center justify-between text-xs text-slate-500 mb-2 font-mono">
-          <span className="flex items-center gap-1.5 font-bold text-slate-700">
-            <span className="w-2 h-2 rounded-full bg-[#1877f2]" />
-            Preview Format Pesan WhatsApp:
-          </span>
-          <span className="text-[11px] text-[#1877f2] bg-blue-50 px-2 py-0.5 rounded-md font-semibold">
-            {currentCard.bankAccounts?.length || 1} Bank Terdaftar
-          </span>
-        </div>
-        <div className="p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl font-mono text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-          {currentWaMessage}
-        </div>
-      </div>
+
 
       {/* 4. RIWAYAT PELAPORAN (If available) */}
       <AnimatePresence>
@@ -854,14 +905,101 @@ Lokasi :${loc || '-'}`;
                   />
                 </div>
 
-                {/* Preview text in modal */}
+                {/* 3. Foto Nota / Bukti Pembayaran */}
                 <div>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Preview Format WhatsApp:
-                  </span>
-                  <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl font-mono text-xs text-slate-800 whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar">
-                    {buildWaCaption(currentCard, lokasi, item)}
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Camera size={14} className="text-[#1877f2]" />
+                      <span>Foto Bukti / Nota Pembayaran :</span>
+                    </label>
+                    {receiptPhoto && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="text-[11px] text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"
+                      >
+                        <Trash2 size={11} /> Hapus Foto
+                      </button>
+                    )}
                   </div>
+
+                  {/* Hidden inputs for Camera and File Picker */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                  <input
+                    type="file"
+                    ref={cameraInputRef}
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+
+                  {!receiptPhotoPreview ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="py-3 px-3 bg-blue-50/60 hover:bg-blue-100/70 border border-blue-200 border-dashed rounded-xl text-xs font-semibold text-[#1877f2] flex flex-col items-center justify-center gap-1.5 transition-all group active:scale-[0.98]"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-white text-[#1877f2] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                          <Camera size={16} />
+                        </div>
+                        <span className="font-bold">Foto Kamera</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="py-3 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 border-dashed rounded-xl text-xs font-semibold text-slate-700 flex flex-col items-center justify-center gap-1.5 transition-all group active:scale-[0.98]"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-white text-slate-600 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                          <Paperclip size={16} />
+                        </div>
+                        <span className="font-bold">Pilih Galeri</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={receiptPhotoPreview}
+                          alt="Foto Nota"
+                          className="w-13 h-13 object-cover rounded-lg border border-white shadow-xs shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {receiptPhoto?.name || 'Foto Nota'}
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-[#1877f2] font-semibold mt-0.5">
+                            {receiptPhoto ? (receiptPhoto.size / 1024).toFixed(0) + ' KB' : ''} • Siap dikirim
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-[#1877f2] text-xs font-bold shadow-xs transition-colors"
+                        >
+                          Ganti
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-slate-400 mt-1.5 leading-tight">
+                    *Pada HP (Android & iOS), foto & caption nota akan langsung terkirim bersamaan ke WhatsApp.
+                  </p>
                 </div>
               </div>
 
@@ -876,11 +1014,21 @@ Lokasi :${loc || '-'}`;
                 </button>
                 <button
                   type="button"
+                  disabled={isSharingPhoto}
                   onClick={handleConfirmDirectWa}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-[#1877f2] hover:bg-blue-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all"
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-[#1877f2] hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all"
                 >
-                  <MessageCircle size={15} />
-                  <span>Kirim ke WhatsApp</span>
+                  {isSharingPhoto ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      <span>Menyiapkan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <MessageCircle size={15} />
+                      <span>{receiptPhoto ? 'Kirim Foto & Caption' : 'Kirim ke WhatsApp'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>
