@@ -235,18 +235,24 @@ export default function Layout() {
             exit={{ opacity: 0 }}
             className="flex-1 flex flex-col lg:flex-row h-[100dvh] overflow-hidden"
           >
-            {/* Desktop Sidebar (Instagram Web Style) */}
-            <nav className="hidden lg:flex w-[240px] border-r border-white/10 flex-col p-6 h-full shrink-0 bg-black">
+            {/* Desktop Sidebar */}
+            <nav className={`hidden lg:flex w-[240px] flex-col p-6 h-full shrink-0 ${
+              role === 'SCM' 
+                ? 'bg-white border-r border-slate-200 text-slate-800' 
+                : 'border-r border-white/10 bg-black text-white'
+            }`}>
               <div className="mb-10 px-3 flex flex-col">
-                <h1 className="text-2xl font-light tracking-tight italic leading-tight text-white">Renovki</h1>
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Dashboard</p>
+                <h1 className={`text-2xl font-bold tracking-tight leading-tight ${role === 'SCM' ? 'text-[#1877f2]' : 'text-white italic font-light'}`}>Renovki</h1>
+                <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${role === 'SCM' ? 'text-slate-400' : 'text-white/40'}`}>
+                  {role === 'SCM' ? 'Divisi SCM' : 'Dashboard'}
+                </p>
               </div>
 
               <div className="flex-1 space-y-2">
                 {/* Menu samping dihilangkan sesuai permintaan */}
               </div>
 
-              <div className="mt-auto pt-6 border-t border-border-ig">
+              <div className={`mt-auto pt-6 border-t ${role === 'SCM' ? 'border-slate-200' : 'border-border-ig'}`}>
                 <SidebarLink 
                   icon={<LogOut size={24} />} 
                   label="Logout" 
@@ -255,57 +261,69 @@ export default function Layout() {
               </div>
             </nav>
 
-            <div className="flex-1 flex flex-col relative h-full overflow-hidden bg-black text-white">
-              {/* Global Background Image with Overlay */}
-              <div 
-                className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-                style={{ backgroundImage: 'url("https://4kwallpapers.com/images/walls/thumbs_3t/26286.jpg")' }}
-              />
-              <div className="absolute inset-0 z-0 bg-black/60 backdrop-blur-[2px]" />
+            <div className={`flex-1 flex flex-col relative h-full overflow-hidden ${role === 'SCM' ? 'bg-[#f0f2f5] text-slate-800' : 'bg-black text-white'}`}>
+              {/* Global Background Image with Overlay (Only for non-SCM) */}
+              {role !== 'SCM' && (
+                <>
+                  <div 
+                    className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+                    style={{ backgroundImage: 'url("https://4kwallpapers.com/images/walls/thumbs_3t/26286.jpg")' }}
+                  />
+                  <div className="absolute inset-0 z-0 bg-black/60 backdrop-blur-[2px]" />
+                </>
+              )}
               
               <div className="flex-1 flex flex-col relative h-full overflow-hidden bg-transparent z-10">
               {/* Mobile Mobile Header */}
-              <header className="lg:hidden h-[60px] border-b border-white/5 flex items-center justify-between px-4 shrink-0 sticky top-0 bg-black/40 backdrop-blur-md z-30">
+              <header className={`lg:hidden h-[60px] flex items-center justify-between px-4 shrink-0 sticky top-0 z-30 ${
+                role === 'SCM' 
+                  ? 'bg-white border-b border-slate-200 text-slate-900 shadow-xs' 
+                  : 'border-b border-white/5 bg-black/40 backdrop-blur-md text-white'
+              }`}>
                 <div className="flex items-center gap-3">
                   <button 
                     onClick={() => window.history.back()}
-                    className="p-1 rounded-full transition-colors text-white active:opacity-60"
+                    className={`p-1 rounded-full transition-colors active:opacity-60 ${
+                      role === 'SCM' ? 'text-slate-700 hover:bg-slate-100' : 'text-white'
+                    }`}
                   >
                     <ArrowLeft size={24} />
                   </button>
-                  <span className="font-bold text-lg tracking-tight text-white">
+                  <span className={`font-bold text-lg tracking-tight ${role === 'SCM' ? 'text-[#1877f2]' : 'text-white'}`}>
                     {role === 'SM' ? 'Divisi Konstruksi' : 'Divisi SCM'}
                   </span>
                 </div>
                 
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => {
-                      setShowNotebook(true);
-                      window.history.pushState({ role, isSubNav: true }, '');
-                    }}
-                    className="p-1 transition-opacity text-white opacity-100 active:opacity-60"
-                  >
-                    <Send size={24} strokeWidth={2} className="-rotate-12" />
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (!showNotifications) {
+                {role !== 'SCM' && (
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => {
+                        setShowNotebook(true);
                         window.history.pushState({ role, isSubNav: true }, '');
-                      }
-                      setShowNotifications(!showNotifications);
-                    }}
-                    className="relative p-1 transition-opacity text-white opacity-100 active:opacity-60"
-                  >
-                    <Bell size={24} strokeWidth={2} />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 w-[10px] h-[10px] bg-red-500 rounded-full border-2 border-black" />
-                    )}
-                  </button>
-                </div>
+                      }}
+                      className="p-1 transition-opacity text-white opacity-100 active:opacity-60"
+                    >
+                      <Send size={24} strokeWidth={2} className="-rotate-12" />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (!showNotifications) {
+                          window.history.pushState({ role, isSubNav: true }, '');
+                        }
+                        setShowNotifications(!showNotifications);
+                      }}
+                      className="relative p-1 transition-opacity text-white opacity-100 active:opacity-60"
+                    >
+                      <Bell size={24} strokeWidth={2} />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 w-[10px] h-[10px] bg-red-500 rounded-full border-2 border-black" />
+                      )}
+                    </button>
+                  </div>
+                )}
               </header>
 
-              <main className="flex-1 overflow-hidden p-0 lg:max-w-4xl lg:mx-auto lg:w-full relative">
+              <main className={`flex-1 overflow-hidden p-0 lg:max-w-4xl lg:mx-auto lg:w-full relative ${role === 'SCM' ? 'bg-[#f0f2f5]' : ''}`}>
                 <div className="h-full">
                   <motion.div
                     key={role}

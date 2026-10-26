@@ -8,7 +8,6 @@ import {
   Copy, 
   Store, 
   User, 
-  Phone, 
   MapPin, 
   Package, 
   Building2, 
@@ -17,24 +16,27 @@ import {
   Trash2, 
   History, 
   RotateCcw,
-  Tag,
   CheckCircle2,
-  FolderPlus,
-  Layers
+  Sparkles,
+  BookmarkPlus,
+  Camera,
+  ArrowLeftRight,
+  Search,
+  ChevronDown
 } from 'lucide-react';
+import { CharacterAvatar, CHARACTERS } from './CharacterAvatars';
 
 export interface BankAccount {
   id: string;
   bank: string;
   noRekening: string;
+  atasNama: string;
 }
 
 export interface VendorCard {
   id: string;
-  nama: string; // Penerima A/N
-  nomorHp: string;
   namaToko: string;
-  kategori: string;
+  characterId: number; // 1 to 20
   bankAccounts: BankAccount[];
 }
 
@@ -43,48 +45,42 @@ interface ReportHistory {
   timestamp: string;
   item: string;
   lokasi: string;
-  vendorNama: string;
-  bankAccounts: BankAccount[];
   namaToko: string;
+  bankAccounts: BankAccount[];
 }
 
-const DEFAULT_CATEGORIES = [
-  'Material Pokok',
-  'Bahan Bangunan',
-  'Besi & Baja',
-  'Cat & Finishing'
+const DEFAULT_LOCATIONS = [
+  'Gudang Utama',
+  'Workshop',
+  'Proyek A',
+  'Proyek B',
+  'Site Lapangan'
 ];
 
 const DEFAULT_CARDS: VendorCard[] = [
   {
     id: '1',
-    nama: 'Rusnawati',
-    nomorHp: '08111949322',
     namaToko: 'TB Rusnawati Jaya',
-    kategori: 'Material Pokok',
+    characterId: 1,
     bankAccounts: [
-      { id: 'b1', bank: 'BRI', noRekening: '707301021739533' },
-      { id: 'b2', bank: 'BCA', noRekening: '8690123456' }
+      { id: 'b1', bank: 'BRI', noRekening: '707301021739533', atasNama: 'Rusnawati' },
+      { id: 'b2', bank: 'BCA', noRekening: '707301021739533', atasNama: 'Ramli' }
     ]
   },
   {
     id: '2',
-    nama: 'H. Rusli',
-    nomorHp: '081298765432',
     namaToko: 'Pusat Pasir & Batu Alam',
-    kategori: 'Material Pokok',
+    characterId: 5,
     bankAccounts: [
-      { id: 'b1', bank: 'BCA', noRekening: '8690123456' }
+      { id: 'b1', bank: 'BCA', noRekening: '8690123456', atasNama: 'H. Rusli' }
     ]
   },
   {
     id: '3',
-    nama: 'Budi Santoso',
-    nomorHp: '081387654321',
     namaToko: 'Depo Semen & Besi Mandiri',
-    kategori: 'Besi & Baja',
+    characterId: 7,
     bankAccounts: [
-      { id: 'b1', bank: 'Mandiri', noRekening: '1370019827364' }
+      { id: 'b1', bank: 'Mandiri', noRekening: '1370019827364', atasNama: 'Budi Santoso' }
     ]
   }
 ];
@@ -92,38 +88,42 @@ const DEFAULT_CARDS: VendorCard[] = [
 const POPULAR_BANKS = ['BRI', 'BCA', 'Mandiri', 'BNI', 'BSI', 'CIMB'];
 
 export default function SCMDashboard() {
-  // 1. Categories State (Stored in localStorage)
-  const [categories, setCategories] = useState<string[]>(() => {
+  // 1. Saved Locations State (Persisted)
+  const [savedLocations, setSavedLocations] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('scm_vendor_categories');
+      const saved = localStorage.getItem('scm_saved_locations');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {
-      console.error('Failed to load categories', e);
+      console.error('Failed to load saved locations', e);
     }
-    return DEFAULT_CATEGORIES;
+    return DEFAULT_LOCATIONS;
   });
 
-  // 2. Cards State (Stored in localStorage, with backward compatibility)
+  // 2. Cards State (With atasNama per bank, characterId, no HP, no category)
   const [cards, setCards] = useState<VendorCard[]>(() => {
     try {
       const saved = localStorage.getItem('scm_vendor_cards');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Normalize older card formats if they had single bank/noRekening
           return parsed.map((card: any, idx: number) => {
+            const defaultAtasNama = card.nama || 'Penerima';
             const bankAccounts = Array.isArray(card.bankAccounts) && card.bankAccounts.length > 0
-              ? card.bankAccounts
-              : [{ id: 'b_' + idx, bank: card.bank || 'BRI', noRekening: card.noRekening || '707301021739533' }];
+              ? card.bankAccounts.map((b: any, bIdx: number) => ({
+                  id: b.id || 'b_' + idx + '_' + bIdx,
+                  bank: b.bank || 'BRI',
+                  noRekening: b.noRekening || '707301021739533',
+                  atasNama: b.atasNama || defaultAtasNama
+                }))
+              : [{ id: 'b_' + idx, bank: card.bank || 'BRI', noRekening: card.noRekening || '707301021739533', atasNama: defaultAtasNama }];
+
             return {
               id: card.id || String(Date.now() + idx),
-              nama: card.nama || 'Nama Penerima',
-              nomorHp: card.nomorHp || '',
               namaToko: card.namaToko || 'Toko Vendor',
-              kategori: card.kategori || DEFAULT_CATEGORIES[0],
+              characterId: Number(card.characterId) || (idx % 20 + 1),
               bankAccounts
             };
           });
@@ -141,25 +141,30 @@ export default function SCMDashboard() {
 
   const currentCard = cards.find(c => c.id === activeCardId) || cards[0] || DEFAULT_CARDS[0];
 
-  // 3. Detail Pembayaran Inputs (Lokasi & Item)
-  const [lokasi, setLokasi] = useState('Workshop');
-  const [item, setItem] = useState('Pasir');
+  // 3. Detail Pembayaran Inputs (Lokasi & Item - Default item kosong)
+  const [lokasi, setLokasi] = useState('Gudang Utama');
+  const [item, setItem] = useState('');
 
   // 4. Modals & UI Controls
+  const [isPaymentDetailModalOpen, setIsPaymentDetailModalOpen] = useState(false);
   const [isSelectorModalOpen, setIsSelectorModalOpen] = useState(false);
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('Semua');
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
+  const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+  const [newLocationInput, setNewLocationInput] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editCardData, setEditCardData] = useState<VendorCard>(currentCard);
   const [isCreatingNewCard, setIsCreatingNewCard] = useState(false);
 
+  // Character Picker Modal (20 Options)
+  const [isCharacterPickerOpen, setIsCharacterPickerOpen] = useState(false);
+  const [characterPickerTarget, setCharacterPickerTarget] = useState<'current' | 'edit'>('current');
+
   const [copied, setCopied] = useState(false);
   const [copiedRekening, setCopiedRekening] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [locationSavedFeedback, setLocationSavedFeedback] = useState(false);
 
-  // 5. Reporting History
+  // 5. History Log
   const [history, setHistory] = useState<ReportHistory[]>(() => {
     try {
       const saved = localStorage.getItem('scm_report_history');
@@ -170,14 +175,14 @@ export default function SCMDashboard() {
     return [];
   });
 
-  // Persist Categories
+  // Persist Saved Locations
   useEffect(() => {
     try {
-      localStorage.setItem('scm_vendor_categories', JSON.stringify(categories));
+      localStorage.setItem('scm_saved_locations', JSON.stringify(savedLocations));
     } catch (e) {
-      console.error('Failed to save categories', e);
+      console.error('Failed to save locations', e);
     }
-  }, [categories]);
+  }, [savedLocations]);
 
   // Persist Cards
   useEffect(() => {
@@ -197,14 +202,16 @@ export default function SCMDashboard() {
     }
   }, [history]);
 
-  // Primary Bank Account for the Card Display (only 1 displayed on card)
+  // Primary Bank Account for the Card Display
   const primaryBank = currentCard.bankAccounts?.[0] || {
     id: 'b1',
     bank: 'BRI',
-    noRekening: '707301021739533'
+    noRekening: '707301021739533',
+    atasNama: 'Rusnawati'
   };
 
-  // Generate WhatsApp message caption including ALL entered banks
+  // Generate WhatsApp message caption as requested:
+  // Quote Text WhatsApp formatting for Bank, No Rek, and A/N
   const buildWaCaption = (
     c: VendorCard = currentCard, 
     loc: string = lokasi, 
@@ -212,23 +219,26 @@ export default function SCMDashboard() {
   ) => {
     const accounts = c.bankAccounts && c.bankAccounts.length > 0 
       ? c.bankAccounts 
-      : [{ id: 'b1', bank: 'BRI', noRekening: '707301021739533' }];
+      : [{ id: 'b1', bank: 'BRI', noRekening: '707301021739533', atasNama: 'Rusnawati' }];
 
-    let bankLines = '';
-    if (accounts.length === 1) {
-      bankLines = `No Rekening : ${accounts[0].noRekening || '-'}\nBank : ${accounts[0].bank || '-'}`;
-    } else {
-      bankLines = accounts.map((acc, idx) => {
-        const suffix = idx === 0 ? '' : ` ${idx + 1}`;
-        return `No Rekening${suffix} : ${acc.noRekening || '-'}\nBank${suffix} : ${acc.bank || '-'}`;
-      }).join('\n');
-    }
+    // Full separator line for mobile WhatsApp
+    const separator = '------------------------------------';
 
-    return `Bismillah @08111949322
+    // Quote blocks formatted with "> " for Bank & A/N
+    // No rekening is placed on its own line without "> " (raw digits) so WhatsApp on Android & iOS detects it as a number and turns it BLUE for instant tap/long-press to copy!
+    const bankQuotes = accounts.map((acc) => {
+      const bankLine = `> Bank : ${acc.bank || '-'}`;
+      const anLine = `> A/N : ${acc.atasNama || '-'}`;
+      const rekLine = `${acc.noRekening || '-'}`;
+      return `${bankLine}\n${anLine}\n${rekLine}`;
+    }).join('\n\n');
 
-- Nota Pembayaran
-${bankLines}
-Penerima A/N : ${c.nama || '-'}
+    return `Bismillah 
+@08111949322
+Berikut Nota Pembayaran Project ${loc || '-'}
+${separator}
+${bankQuotes}
+
 Item Pembelian : ${itm || '-'}
 Lokasi :${loc || '-'}`;
   };
@@ -248,9 +258,8 @@ Lokasi :${loc || '-'}`;
     setTimeout(() => setCopiedRekening(false), 2000);
   };
 
-  // Direct to WhatsApp without target number (allows user to select recipient in WA)
-  const handleDirectWa = () => {
-    // Record into history
+  // Direct to WhatsApp after detail input
+  const handleConfirmDirectWa = () => {
     const newEntry: ReportHistory = {
       id: Date.now().toString(),
       timestamp: new Date().toLocaleString('id-ID', { 
@@ -261,48 +270,51 @@ Lokasi :${loc || '-'}`;
       }),
       item,
       lokasi,
-      vendorNama: currentCard.nama,
-      bankAccounts: currentCard.bankAccounts,
-      namaToko: currentCard.namaToko
+      namaToko: currentCard.namaToko,
+      bankAccounts: currentCard.bankAccounts
     };
     setHistory(prev => [newEntry, ...prev.slice(0, 19)]);
 
-    // Construct WA universal share link without specific phone number
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(currentWaMessage)}`;
-    
     const win = window.open(waUrl, '_blank');
     if (!win) {
       window.location.href = waUrl;
     }
+    setIsPaymentDetailModalOpen(false);
   };
 
-  // Categories helper
-  const handleAddCategory = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = newCategoryName.trim();
+  // Save current typed location
+  const handleSaveCurrentLocation = () => {
+    const trimmed = lokasi.trim();
     if (!trimmed) return;
-    if (!categories.includes(trimmed)) {
-      setCategories(prev => [...prev, trimmed]);
-      setSelectedCategoryFilter(trimmed);
+    if (!savedLocations.includes(trimmed)) {
+      setSavedLocations(prev => [trimmed, ...prev]);
+      setLocationSavedFeedback(true);
+      setTimeout(() => setLocationSavedFeedback(false), 2000);
     }
-    setNewCategoryName('');
-    setIsAddingCategory(false);
   };
 
-  const handleDeleteCategory = (catToDelete: string, e: React.MouseEvent) => {
+  // Add new location directly from inside the dropdown
+  const handleAddLocationFromDropdown = () => {
+    const trimmed = newLocationInput.trim();
+    if (!trimmed) return;
+    if (!savedLocations.includes(trimmed)) {
+      setSavedLocations(prev => [...prev, trimmed]);
+    }
+    setLokasi(trimmed);
+    setNewLocationInput('');
+    setIsLocationDropdownOpen(false);
+    setLocationSavedFeedback(true);
+    setTimeout(() => setLocationSavedFeedback(false), 2000);
+  };
+
+  const handleDeleteSavedLocation = (locToDelete: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (categories.length <= 1) return;
-    setCategories(prev => prev.filter(c => c !== catToDelete));
-    if (selectedCategoryFilter === catToDelete) {
-      setSelectedCategoryFilter('Semua');
-    }
+    if (savedLocations.length <= 1) return;
+    setSavedLocations(prev => prev.filter(l => l !== locToDelete));
   };
 
-  // Card selector helpers
-  const filteredCards = selectedCategoryFilter === 'Semua'
-    ? cards
-    : cards.filter(c => c.kategori === selectedCategoryFilter);
-
+  // Delete Card
   const handleDeleteCard = (cardId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (cards.length <= 1) return;
@@ -321,16 +333,14 @@ Lokasi :${loc || '-'}`;
   };
 
   // Open Create modal for new card
-  const handleOpenCreateModal = (presetCategory?: string) => {
+  const handleOpenCreateModal = () => {
     setIsCreatingNewCard(true);
     const newCard: VendorCard = {
       id: Date.now().toString(),
-      nama: '',
-      nomorHp: '',
       namaToko: '',
-      kategori: presetCategory && presetCategory !== 'Semua' ? presetCategory : (categories[0] || 'Material Pokok'),
+      characterId: 1,
       bankAccounts: [
-        { id: 'b_' + Date.now(), bank: 'BRI', noRekening: '' }
+        { id: 'b_' + Date.now(), bank: 'BRI', noRekening: '', atasNama: '' }
       ]
     };
     setEditCardData(newCard);
@@ -349,12 +359,23 @@ Lokasi :${loc || '-'}`;
     setIsEditModalOpen(false);
   };
 
+  // Select character from picker modal
+  const handleSelectCharacter = (charId: number) => {
+    if (characterPickerTarget === 'current') {
+      setCards(prev => prev.map(c => c.id === currentCard.id ? { ...c, characterId: charId } : c));
+    } else {
+      setEditCardData(prev => ({ ...prev, characterId: charId }));
+    }
+    setIsCharacterPickerOpen(false);
+  };
+
   // Bank accounts in Edit form
   const handleAddBankAccount = () => {
     const newBank: BankAccount = {
       id: 'b_' + Date.now(),
       bank: 'BCA',
-      noRekening: ''
+      noRekening: '',
+      atasNama: primaryBank.atasNama || ''
     };
     setEditCardData(prev => ({
       ...prev,
@@ -362,7 +383,7 @@ Lokasi :${loc || '-'}`;
     }));
   };
 
-  const handleUpdateBankAccount = (index: number, field: 'bank' | 'noRekening', value: string) => {
+  const handleUpdateBankAccount = (index: number, field: keyof BankAccount, value: string) => {
     const updated = [...editCardData.bankAccounts];
     updated[index] = { ...updated[index], [field]: value };
     setEditCardData(prev => ({ ...prev, bankAccounts: updated }));
@@ -374,283 +395,216 @@ Lokasi :${loc || '-'}`;
     setEditCardData(prev => ({ ...prev, bankAccounts: updated }));
   };
 
-  // Format account digits with spacing for credit-card look
+  // Format account digits with spacing
   const formatCardDigits = (digits: string) => {
     if (!digits) return '---- ---- ---- ----';
     const clean = digits.replace(/\s+/g, '');
     return clean.match(/.{1,4}/g)?.join(' ') || clean;
   };
 
+  const isCurrentLocationSaved = savedLocations.includes(lokasi.trim());
+
+  // Interactive real-time search filter for List Supplier
+  const filteredCards = cards.filter((card) => {
+    if (!supplierSearchQuery.trim()) return true;
+    const q = supplierSearchQuery.toLowerCase();
+    const matchToko = card.namaToko?.toLowerCase().includes(q);
+    const matchBank = card.bankAccounts?.some(b => 
+      b.bank?.toLowerCase().includes(q) || 
+      b.noRekening?.toLowerCase().includes(q) || 
+      b.atasNama?.toLowerCase().includes(q)
+    );
+    return Boolean(matchToko || matchBank);
+  });
+
   return (
-    <div className="h-full flex flex-col overflow-y-auto px-4 py-5 lg:px-8 max-w-2xl mx-auto custom-scrollbar safe-area-pb">
-      {/* Header Info & Action Buttons */}
-      <div className="flex items-center justify-between mb-4">
+    <div className="min-h-full bg-[#f0f2f5] text-slate-800 flex flex-col px-4 py-5 lg:px-8 max-w-2xl mx-auto custom-scrollbar safe-area-pb">
+      {/* Facebook Style Header Navigation */}
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#1877f2]" />
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">
               Pelaporan SCM
             </h2>
           </div>
-          <p className="text-xs text-white/50 mt-0.5">
-            Pelaporan pembayaran material via WhatsApp
+          <p className="text-xs text-slate-500 mt-0.5">
+            Format laporan pembayaran material WhatsApp
           </p>
         </div>
 
-        {/* Action icons */}
+        {/* Action Buttons: Riwayat & Ganti Kartu (Logo Change Saja) */}
         <div className="flex items-center gap-2">
           {history.length > 0 && (
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all text-xs flex items-center gap-1.5"
+              className="p-2.5 rounded-xl bg-white border border-slate-200 hover:bg-blue-50 text-slate-700 hover:text-[#1877f2] transition-all text-xs flex items-center shadow-xs"
               title="Riwayat Pelaporan"
+              aria-label="Riwayat Pelaporan"
             >
-              <History size={15} />
-              <span className="hidden sm:inline">Riwayat ({history.length})</span>
+              <History size={17} />
             </button>
           )}
 
-          {/* Tombol Ganti Kartu: Opens Category & Saved Cards Modal */}
+          {/* Tombol List Supplier: Logo Change Saja */}
           <button
             onClick={() => setIsSelectorModalOpen(true)}
-            className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-xs flex items-center gap-2 shadow-sm transition-all"
-            title="Pilih & Ganti Kartu Vendor"
+            className="p-2.5 rounded-xl bg-[#1877f2] hover:bg-blue-700 text-white font-semibold shadow-xs transition-all flex items-center justify-center"
+            title="List Supplier"
+            aria-label="List Supplier"
           >
-            <Layers size={15} className="text-amber-400" />
-            <span>Ganti Kartu</span>
+            <ArrowLeftRight size={17} />
           </button>
         </div>
       </div>
 
-      {/* 1. CARD DISPLAY (Interactive Payment Card - Only 1 Bank Displayed) */}
-      <div className="relative group mb-6">
-        {/* Ambient Glow */}
-        <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-blue-500/20 rounded-3xl blur-xl opacity-60 group-hover:opacity-90 transition duration-500 pointer-events-none" />
-
+      {/* 1. CARD DISPLAY (Nomor Rekening di atas, Nama Toko di pampang di tengah) */}
+      <div className="relative group mb-5">
         <div
           onClick={() => handleOpenEditModal(currentCard)}
-          className="relative w-full rounded-3xl p-6 cursor-pointer select-none bg-gradient-to-br from-zinc-900 via-neutral-900 to-black border border-white/20 shadow-2xl overflow-hidden hover:border-amber-400/50 hover:shadow-amber-500/10 transition-all duration-300 transform active:scale-[0.985]"
+          className="relative w-full rounded-2xl p-5 sm:p-6 cursor-pointer select-none bg-white border border-slate-200 hover:border-blue-300 shadow-[0_1px_3px_rgba(0,0,0,0.08)] hover:shadow-md transition-all duration-200 transform active:scale-[0.99]"
         >
-          {/* Subtle Card Background Texture Accent */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-radial from-white/5 to-transparent rounded-full -mr-16 -mt-16 pointer-events-none" />
-          <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
-
-          {/* Top Bar: Chip + Nama Toko/Vendor + Bank badge */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              {/* EMV Metallic Golden Chip Accent */}
-              <div className="relative shrink-0">
-                <svg 
-                  className="w-12 h-9 rounded-md overflow-hidden shadow-md shadow-black/50 border border-amber-300/40" 
-                  viewBox="0 0 48 36" 
-                  fill="none" 
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect width="48" height="36" rx="4" fill="url(#chipGoldGradient)" />
-                  <rect x="1" y="1" width="46" height="34" rx="3" stroke="#FDE68A" strokeWidth="0.8" strokeOpacity="0.8" fill="none" />
-                  {/* Chip Tracings */}
-                  <path d="M 0 12 H 16 M 0 24 H 16 M 32 12 H 48 M 32 24 H 48 M 16 0 V 36 M 32 0 V 36 M 16 12 H 32 M 16 24 H 32" stroke="#78350F" strokeWidth="1" strokeOpacity="0.75" />
-                  <circle cx="24" cy="18" r="4.5" fill="#F59E0B" stroke="#92400E" strokeWidth="0.8" />
-                  <defs>
-                    <linearGradient id="chipGoldGradient" x1="0" y1="0" x2="48" y2="36" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#FDE68A" />
-                      <stop offset="0.25" stopColor="#F59E0B" />
-                      <stop offset="0.75" stopColor="#D97706" />
-                      <stop offset="1" stopColor="#B45309" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+          {/* Top Bar: Character Avatar + Nomor Rekening & Bank Badge */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3.5">
+              {/* Interactive Character Avatar */}
+              <div 
+                className="relative group/avatar cursor-pointer shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCharacterPickerTarget('current');
+                  setIsCharacterPickerOpen(true);
+                }}
+                title="Klik untuk ganti karakter (20 opsi)"
+              >
+                <CharacterAvatar id={currentCard.characterId || 1} className="w-13 h-13 sm:w-14 sm:h-14" />
+                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#1877f2] text-white flex items-center justify-center shadow-md border-2 border-white group-hover/avatar:scale-110 transition-transform">
+                  <Camera size={10} />
+                </div>
               </div>
 
-              {/* Nama Toko / Vendor */}
+              {/* Nomor Rekening di Atas (Menggantikan Nama Toko sebelumnya) */}
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <Store size={13} className="text-amber-400 shrink-0" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/90 truncate">
-                    {currentCard.kategori || 'Vendor'}
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#1877f2] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                    Rekening {primaryBank.bank || 'Utama'}
                   </span>
+                  {currentCard.bankAccounts && currentCard.bankAccounts.length > 1 && (
+                    <span className="text-[10px] text-[#1877f2] font-semibold bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100">
+                      +{currentCard.bankAccounts.length - 1} Bank
+                    </span>
+                  )}
                 </div>
-                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight truncate max-w-[190px] sm:max-w-[280px]">
-                  {currentCard.namaToko || 'Nama Toko / Vendor'}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm sm:text-base font-bold text-slate-800 tracking-wider">
+                    {formatCardDigits(primaryBank.noRekening)}
+                  </span>
+                  <button
+                    onClick={handleCopyRekening}
+                    className="p-1 text-[#1877f2] hover:bg-blue-50 rounded transition-colors"
+                    title="Salin No Rekening"
+                  >
+                    {copiedRekening ? <Check size={13} className="text-[#1877f2]" /> : <Copy size={13} />}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Display only 1 Bank on Card Face */}
+            {/* Bank Badge */}
             <div className="flex flex-col items-end gap-1 shrink-0">
-              <span className="px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-black tracking-widest text-white shadow-inner uppercase">
+              <span className="px-3 py-1 rounded-full bg-[#1877f2] text-white text-xs font-black tracking-wider uppercase shadow-xs">
                 {primaryBank.bank || 'BANK'}
               </span>
-              {currentCard.bankAccounts && currentCard.bankAccounts.length > 1 && (
-                <span className="text-[9px] text-emerald-400 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                  +{currentCard.bankAccounts.length - 1} Bank Lain
-                </span>
-              )}
             </div>
           </div>
 
-          {/* Center: Nomor Rekening (Primary Bank only on card face) */}
-          <div className="my-5">
-            <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-widest text-white/40 mb-1.5">
-              <span>Nomor Rekening ({primaryBank.bank})</span>
-              <button
-                onClick={handleCopyRekening}
-                className="text-white/60 hover:text-white flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10"
-              >
-                {copiedRekening ? (
-                  <>
-                    <Check size={11} className="text-emerald-400" />
-                    <span className="text-emerald-400">Tersalin</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={11} />
-                    <span>Salin</span>
-                  </>
-                )}
-              </button>
+          {/* Center Box: NAMA TOKO / VENDOR (Di pampang di bagian utama kartu) */}
+          <div className="my-3 p-4 bg-blue-50/70 border border-blue-100 rounded-xl">
+            <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-1">
+              <Store size={12} className="text-[#1877f2]" />
+              <span>Nama Toko / Vendor</span>
             </div>
-            <div className="font-mono text-xl sm:text-2xl font-bold tracking-[0.16em] text-white text-shadow-sm select-all">
-              {formatCardDigits(primaryBank.noRekening)}
-            </div>
-          </div>
-
-          {/* Bottom Row: (Nama) & (Nomor Hp) */}
-          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/10 mt-4">
-            {/* Nama Penerima A/N */}
-            <div className="min-w-0">
-              <div className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-white/50 mb-0.5">
-                <User size={12} className="text-white/60" />
-                <span>Penerima A/N</span>
-              </div>
-              <p className="text-sm sm:text-base font-semibold text-white tracking-tight truncate">
-                {currentCard.nama || '-'}
-              </p>
-            </div>
-
-            {/* Nomor HP Vendor */}
-            <div className="min-w-0 text-right">
-              <div className="flex items-center justify-end gap-1 text-[10px] uppercase font-bold tracking-wider text-white/50 mb-0.5">
-                <Phone size={12} className="text-white/60" />
-                <span>Nomor HP</span>
-              </div>
-              <p className="text-sm sm:text-base font-semibold text-amber-200/90 tracking-tight font-mono truncate">
-                {currentCard.nomorHp || '-'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. DETAIL PEMBAYARAN (Inputs Lokasi & Item - Tanpa Bar Pilihan) */}
-      <div className="bg-zinc-900/70 border border-white/10 rounded-2xl p-5 mb-5 backdrop-blur-md shadow-lg">
-        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/10">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-            <Package size={16} />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              Detail Pembayaran
+            <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
+              {currentCard.namaToko || 'Nama Toko / Vendor'}
             </h3>
-            <p className="text-[11px] text-white/40">
-              Input lokasi dan item material untuk nota pembayaran
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {/* Input 1: Lokasi : */}
-          <div>
-            <label className="block text-xs font-semibold text-white/70 mb-1.5 flex items-center gap-1.5">
-              <MapPin size={14} className="text-emerald-400" />
-              <span>Lokasi :</span>
-            </label>
-            <input
-              type="text"
-              value={lokasi}
-              onChange={(e) => setLokasi(e.target.value)}
-              placeholder="Masukkan lokasi (contoh: Workshop)"
-              className="w-full px-3.5 py-2.5 bg-black/50 border border-white/15 focus:border-emerald-500 rounded-xl text-white placeholder-white/25 text-sm focus:outline-none transition-colors"
-            />
           </div>
 
-          {/* Input 2: Item */}
-          <div>
-            <label className="block text-xs font-semibold text-white/70 mb-1.5 flex items-center gap-1.5">
-              <Package size={14} className="text-amber-400" />
-              <span>Item :</span>
-            </label>
-            <input
-              type="text"
-              value={item}
-              onChange={(e) => setItem(e.target.value)}
-              placeholder="Masukkan item material (contoh: Pasir)"
-              className="w-full px-3.5 py-2.5 bg-black/50 border border-white/15 focus:border-emerald-500 rounded-xl text-white placeholder-white/25 text-sm focus:outline-none transition-colors"
-            />
+          {/* Bottom Row: Penerima A/N */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5 truncate">
+              <User size={13} className="text-[#1877f2] shrink-0" />
+              <span>A/N:</span>
+              <strong className="text-slate-800 truncate">
+                {primaryBank.atasNama || '-'}
+              </strong>
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium shrink-0 flex items-center gap-1">
+              <Edit3 size={11} /> Ketuk untuk edit
+            </span>
           </div>
         </div>
       </div>
 
-      {/* 3. TOMBOL DIRECT KE WHATSAPP (Buka WA & Pilih Kontak) */}
-      <div className="space-y-3 mb-6">
+      {/* 2. TOMBOL KIRIM PESAN KE WHATSAPP (Memicu Popup Detail Pembayaran Terlebih Dahulu) */}
+      <div className="space-y-2.5 mb-5">
         <button
-          onClick={handleDirectWa}
-          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-base shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-3 transition-all duration-200 transform active:scale-[0.98] cursor-pointer"
+          onClick={() => setIsPaymentDetailModalOpen(true)}
+          className="w-full py-4 px-6 rounded-xl bg-[#1877f2] hover:bg-blue-700 text-white font-bold text-base shadow-sm flex items-center justify-center gap-2.5 transition-all duration-200 transform active:scale-[0.99] cursor-pointer"
         >
-          <MessageCircle size={22} className="fill-white/20" />
+          <MessageCircle size={20} />
           <span>Kirim Pesan ke WhatsApp</span>
         </button>
 
         <button
           onClick={handleCopyCaption}
-          className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+          className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-blue-50 border border-slate-200 text-[#1877f2] hover:text-blue-700 text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
         >
           {copied ? (
             <>
-              <Check size={16} className="text-emerald-400" />
-              <span className="text-emerald-400">Format Caption Berhasil Disalin!</span>
+              <Check size={15} className="text-[#1877f2]" />
+              <span className="font-bold">Format Caption Berhasil Disalin!</span>
             </>
           ) : (
             <>
-              <Copy size={16} />
+              <Copy size={15} />
               <span>Salin Format Caption WA</span>
             </>
           )}
         </button>
       </div>
 
-      {/* 4. PREVIEW CAPTION WA (Semua Bank Dimasukkan) */}
-      <div className="bg-black/60 border border-white/10 rounded-2xl p-4 mb-6">
-        <div className="flex items-center justify-between text-xs text-white/50 mb-2 font-mono">
-          <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            Live Preview Format WA:
+      {/* 3. PREVIEW CAPTION WA (Live Preview Sesuai Format Baru) */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5 shadow-xs">
+        <div className="flex items-center justify-between text-xs text-slate-500 mb-2 font-mono">
+          <span className="flex items-center gap-1.5 font-bold text-slate-700">
+            <span className="w-2 h-2 rounded-full bg-[#1877f2]" />
+            Preview Format Pesan WhatsApp:
           </span>
-          <span className="text-[10px] text-white/40">
+          <span className="text-[11px] text-[#1877f2] bg-blue-50 px-2 py-0.5 rounded-md font-semibold">
             {currentCard.bankAccounts?.length || 1} Bank Terdaftar
           </span>
         </div>
-        <div className="p-3.5 bg-zinc-950/90 border border-emerald-500/20 rounded-xl font-mono text-xs sm:text-sm text-emerald-300/90 whitespace-pre-wrap leading-relaxed shadow-inner">
+        <div className="p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl font-mono text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
           {currentWaMessage}
         </div>
       </div>
 
-      {/* 5. RIWAYAT PELAPORAN (If available) */}
+      {/* 4. RIWAYAT PELAPORAN (If available) */}
       <AnimatePresence>
         {showHistory && history.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="bg-zinc-900/80 border border-white/10 rounded-2xl p-4 mb-6 backdrop-blur-md"
+            className="bg-white border border-slate-200 rounded-2xl p-4 mb-5 shadow-xs"
           >
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <History size={14} className="text-white/60" /> Riwayat Pelaporan Nota
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <History size={14} className="text-[#1877f2]" /> Riwayat Pelaporan Nota
               </h4>
               <button
                 onClick={() => setHistory([])}
-                className="text-[11px] text-red-400 hover:text-red-300"
+                className="text-xs text-slate-400 hover:text-slate-600"
               >
                 Hapus Riwayat
               </button>
@@ -659,24 +613,25 @@ Lokasi :${loc || '-'}`;
               {history.map((h) => (
                 <div
                   key={h.id}
-                  className="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between text-xs"
+                  className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-between text-xs"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-white">{h.item}</span>
-                      <span className="text-white/40">•</span>
-                      <span className="text-emerald-400 font-medium">{h.lokasi}</span>
+                      <span className="font-bold text-slate-900">{h.item}</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-[#1877f2] font-semibold">{h.lokasi}</span>
                     </div>
-                    <p className="text-[11px] text-white/50 mt-0.5">
-                      {h.vendorNama} ({h.bankAccounts?.[0]?.bank} - {h.bankAccounts?.[0]?.noRekening}) • {h.timestamp}
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {h.namaToko} ({h.bankAccounts?.[0]?.bank} - {h.bankAccounts?.[0]?.noRekening}) • {h.timestamp}
                     </p>
                   </div>
                   <button
                     onClick={() => {
                       setItem(h.item);
                       setLokasi(h.lokasi);
+                      setIsPaymentDetailModalOpen(true);
                     }}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white"
+                    className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-slate-600 hover:text-[#1877f2]"
                     title="Gunakan item & lokasi ini"
                   >
                     <RotateCcw size={13} />
@@ -688,7 +643,252 @@ Lokasi :${loc || '-'}`;
         )}
       </AnimatePresence>
 
-      {/* POPUP 1: GANTI KARTU & KELOLA KATEGORI */}
+      {/* POPUP: DETAIL PEMBAYARAN (MUNCUL SEBELUM DIRECT KE WHATSAPP) */}
+      <AnimatePresence>
+        {isPaymentDetailModalOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPaymentDetailModalOpen(false)}
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-[120]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[94%] max-w-lg bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 z-[130] shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1877f2]">
+                    <Package size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Detail Pembayaran Material
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Tentukan lokasi proyek dan item sebelum kirim ke WhatsApp
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsPaymentDetailModalOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-5">
+                {/* 1. Lokasi */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <MapPin size={14} className="text-[#1877f2]" />
+                      <span>Lokasi Project :</span>
+                    </label>
+
+                    {/* Tombol Simpan Lokasi Baru */}
+                    {lokasi.trim() && !isCurrentLocationSaved && (
+                      <button
+                        type="button"
+                        onClick={handleSaveCurrentLocation}
+                        className="text-xs text-[#1877f2] hover:text-blue-700 font-semibold flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200 transition-colors"
+                      >
+                        <BookmarkPlus size={12} />
+                        <span>+ Simpan Lokasi</span>
+                      </button>
+                    )}
+
+                    {locationSavedFeedback && (
+                      <span className="text-xs text-[#1877f2] font-semibold flex items-center gap-1">
+                        <Check size={12} /> Tersimpan!
+                      </span>
+                    )}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={lokasi}
+                    onChange={(e) => setLokasi(e.target.value)}
+                    placeholder="Contoh: Gudang Utama / Workshop"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#1877f2] focus:bg-white rounded-xl text-slate-900 text-sm focus:outline-none transition-colors"
+                  />
+
+                  {/* Dropdown: Pilih Lokasi Cepat */}
+                  <div className="relative mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
+                      className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-blue-50/60 border border-slate-200 hover:border-blue-300 rounded-xl text-xs text-slate-700 transition-all font-medium"
+                    >
+                      <span className="flex items-center gap-1.5 text-slate-600 truncate">
+                        <MapPin size={13} className="text-[#1877f2] shrink-0" />
+                        <span>Pilih Lokasi Cepat:</span>
+                        <span className="text-slate-900 font-bold truncate">
+                          {lokasi || 'Belum dipilih'}
+                        </span>
+                      </span>
+                      <ChevronDown
+                        size={14}
+                        className={`text-slate-400 shrink-0 transition-transform duration-200 ${
+                          isLocationDropdownOpen ? 'rotate-180 text-[#1877f2]' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {/* Isi Dropdown */}
+                    <AnimatePresence>
+                      {isLocationDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 p-2 text-xs flex flex-col"
+                        >
+                          <div className="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 mb-1">
+                            <span>Lokasi Tersimpan ({savedLocations.length})</span>
+                          </div>
+
+                          {/* List Lokasi Tersimpan */}
+                          <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-1 py-1">
+                            {savedLocations.map((loc) => {
+                              const isSelected = lokasi === loc;
+                              return (
+                                <div
+                                  key={loc}
+                                  className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-colors group cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-blue-50 text-[#1877f2] font-bold'
+                                      : 'hover:bg-slate-50 text-slate-700'
+                                  }`}
+                                  onClick={() => {
+                                    setLokasi(loc);
+                                    setIsLocationDropdownOpen(false);
+                                  }}
+                                >
+                                  <span className="flex items-center gap-2 truncate flex-1">
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full ${
+                                        isSelected ? 'bg-[#1877f2]' : 'bg-slate-300'
+                                      }`}
+                                    />
+                                    <span className="truncate">{loc}</span>
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    {isSelected && <Check size={13} className="text-[#1877f2]" />}
+                                    {savedLocations.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteSavedLocation(loc, e);
+                                        }}
+                                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all ml-1"
+                                        title="Hapus lokasi ini"
+                                      >
+                                        <Trash2 size={11} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Divider */}
+                          <div className="border-t border-slate-100 my-1.5" />
+
+                          {/* Form Tambah Lokasi Tersimpan di dalam Dropdown */}
+                          <div className="pt-1">
+                            <span className="text-[11px] font-semibold text-slate-500 block mb-1 px-1">
+                              + Tambah Lokasi Tersimpan:
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={newLocationInput}
+                                onChange={(e) => setNewLocationInput(e.target.value)}
+                                placeholder="Nama lokasi baru..."
+                                className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 focus:border-[#1877f2] focus:bg-white rounded-lg text-xs text-slate-900 focus:outline-none"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddLocationFromDropdown();
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                disabled={!newLocationInput.trim()}
+                                onClick={handleAddLocationFromDropdown}
+                                className="px-3 py-1.5 rounded-lg bg-[#1877f2] hover:bg-blue-700 disabled:bg-slate-200 text-white font-bold text-xs transition-colors shrink-0 flex items-center gap-1 shadow-xs"
+                              >
+                                <Plus size={12} />
+                                <span>Simpan</span>
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                {/* 2. Item Material (Default Kosong) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                    <Package size={14} className="text-[#1877f2]" />
+                    <span>Item Pembelian :</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => setItem(e.target.value)}
+                    placeholder="Contoh: Pasir, Semen, Besi, Cat..."
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#1877f2] focus:bg-white rounded-xl text-slate-900 text-sm focus:outline-none transition-colors"
+                  />
+                </div>
+
+                {/* Preview text in modal */}
+                <div>
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Preview Format WhatsApp:
+                  </span>
+                  <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl font-mono text-xs text-slate-800 whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar">
+                    {buildWaCaption(currentCard, lokasi, item)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action buttons in modal */}
+              <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentDetailModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDirectWa}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-[#1877f2] hover:bg-blue-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <MessageCircle size={15} />
+                  <span>Kirim ke WhatsApp</span>
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP: GANTI KARTU (TANPA KATEGORI) */}
       <AnimatePresence>
         {isSelectorModalOpen && (
           <>
@@ -697,140 +897,105 @@ Lokasi :${loc || '-'}`;
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSelectorModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[120]"
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-[140]"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[94%] max-w-lg bg-zinc-950 border border-white/20 rounded-3xl p-5 sm:p-6 z-[130] shadow-2xl flex flex-col max-h-[88vh]"
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[94%] max-w-lg bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 z-[150] shadow-2xl flex flex-col max-h-[85vh]"
             >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+              {/* Modal Header: List Supplier */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                    <Layers size={18} />
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1877f2]">
+                    <ArrowLeftRight size={17} />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white tracking-tight">
-                      Pilih & Kelola Kartu Vendor
+                    <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                      List Supplier
                     </h3>
-                    <p className="text-[11px] text-white/50">
-                      Kelompokkan kartu berdasarkan kategori
+                    <p className="text-xs text-slate-500">
+                      Pilih supplier aktif untuk pelaporan nota pembayaran
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsSelectorModalOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              {/* Kategori Bar (Tabs + Buat Kategori Manual) */}
-              <div className="py-3 border-b border-white/10 shrink-0">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider flex items-center gap-1">
-                    <Tag size={12} className="text-amber-400" /> Kategori Vendor
-                  </span>
+              {/* Kotak Search Supplier Interaktif (Per huruf langsung menyesuaikan) */}
+              <div className="relative mt-3 mb-1 shrink-0">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={supplierSearchQuery}
+                  onChange={(e) => setSupplierSearchQuery(e.target.value)}
+                  placeholder="Cari nama supplier, bank, no rek, A/N..."
+                  className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 focus:border-[#1877f2] focus:bg-white rounded-xl text-slate-900 text-xs sm:text-sm focus:outline-none transition-colors"
+                />
+                {supplierSearchQuery && (
                   <button
-                    onClick={() => setIsAddingCategory(!isAddingCategory)}
-                    className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
+                    type="button"
+                    onClick={() => setSupplierSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200 transition-colors"
+                    title="Hapus pencarian"
                   >
-                    <FolderPlus size={13} /> + Kategori Baru
+                    <X size={13} />
                   </button>
-                </div>
-
-                {/* Inline form to add category manually */}
-                {isAddingCategory && (
-                  <form onSubmit={handleAddCategory} className="flex gap-2 mb-2.5">
-                    <input
-                      type="text"
-                      autoFocus
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="Nama kategori baru..."
-                      className="flex-1 px-3 py-1.5 bg-black/60 border border-emerald-500/50 rounded-xl text-white text-xs focus:outline-none"
-                    />
-                    <button
-                      type="submit"
-                      className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl"
-                    >
-                      Tambah
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingCategory(false)}
-                      className="px-2 py-1.5 bg-white/10 hover:bg-white/15 text-white text-xs rounded-xl"
-                    >
-                      Batal
-                    </button>
-                  </form>
                 )}
-
-                {/* Category Pills list */}
-                <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
-                  <button
-                    onClick={() => setSelectedCategoryFilter('Semua')}
-                    className={`text-xs px-3 py-1.5 rounded-xl border whitespace-nowrap font-medium transition-all ${
-                      selectedCategoryFilter === 'Semua'
-                        ? 'bg-amber-400 text-black border-amber-400 font-bold shadow-sm'
-                        : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
-                    }`}
-                  >
-                    Semua ({cards.length})
-                  </button>
-                  {categories.map((cat) => {
-                    const count = cards.filter(c => c.kategori === cat).length;
-                    return (
-                      <div key={cat} className="flex items-center shrink-0">
-                        <button
-                          onClick={() => setSelectedCategoryFilter(cat)}
-                          className={`text-xs px-3 py-1.5 rounded-l-xl border-y border-l whitespace-nowrap font-medium transition-all ${
-                            selectedCategoryFilter === cat
-                              ? 'bg-amber-400 text-black border-amber-400 font-bold shadow-sm'
-                              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
-                          }`}
-                        >
-                          {cat} ({count})
-                        </button>
-                        {categories.length > 1 && (
-                          <button
-                            onClick={(e) => handleDeleteCategory(cat, e)}
-                            className={`text-xs px-1.5 py-1.5 rounded-r-xl border-y border-r transition-all ${
-                              selectedCategoryFilter === cat
-                                ? 'bg-amber-400 text-black/60 hover:text-black border-amber-400'
-                                : 'bg-white/5 border-white/10 text-white/30 hover:text-red-400'
-                            }`}
-                            title={`Hapus kategori ${cat}`}
-                          >
-                            <X size={12} />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
 
-              {/* Cards List */}
-              <div className="flex-1 overflow-y-auto py-3 space-y-2.5 custom-scrollbar min-h-[160px]">
+              {/* Status Hasil Pencarian */}
+              <div className="flex items-center justify-between px-1 py-1 text-[11px] text-slate-500 shrink-0">
+                <span>
+                  {supplierSearchQuery.trim() ? (
+                    <span>
+                      Ditemukan <strong className="text-[#1877f2] font-bold">{filteredCards.length}</strong> supplier
+                    </span>
+                  ) : (
+                    <span>
+                      Total <strong className="text-slate-700 font-bold">{cards.length}</strong> supplier terdaftar
+                    </span>
+                  )}
+                </span>
+                {supplierSearchQuery.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setSupplierSearchQuery('')}
+                    className="text-[#1877f2] hover:underline font-semibold text-[11px]"
+                  >
+                    Reset pencarian
+                  </button>
+                )}
+              </div>
+
+              {/* Cards List (Hasil Filter Interaktif) */}
+              <div className="flex-1 overflow-y-auto py-2 space-y-2.5 custom-scrollbar min-h-[160px]">
                 {filteredCards.length === 0 ? (
-                  <div className="text-center py-8 text-white/40 text-xs">
-                    <Store size={28} className="mx-auto mb-2 text-white/20" />
-                    <p>Belum ada kartu di kategori ini.</p>
+                  <div className="py-10 text-center text-slate-400 flex flex-col items-center justify-center">
+                    <Store size={32} className="text-slate-300 mb-2 stroke-[1.5]" />
+                    <p className="text-xs font-semibold text-slate-700">
+                      Tidak ada supplier yang cocok dengan "{supplierSearchQuery}"
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+                      Coba ketik kata kunci lain atau daftarkan sebagai supplier baru
+                    </p>
                     <button
-                      onClick={() => handleOpenCreateModal(selectedCategoryFilter)}
-                      className="mt-2 text-amber-400 hover:text-amber-300 font-semibold"
+                      onClick={() => setSupplierSearchQuery('')}
+                      className="mt-3 px-3 py-1.5 rounded-lg bg-blue-50 text-[#1877f2] font-bold text-xs hover:bg-blue-100 transition-colors"
                     >
-                      + Tambah kartu sekarang
+                      Bersihkan Pencarian
                     </button>
                   </div>
                 ) : (
                   filteredCards.map((card) => {
                     const isActive = card.id === activeCardId;
-                    const primary = card.bankAccounts?.[0] || { bank: 'BRI', noRekening: '-' };
+                    const primary = card.bankAccounts?.[0] || { bank: 'BRI', noRekening: '-', atasNama: '-' };
                     const extraBanksCount = (card.bankAccounts?.length || 1) - 1;
 
                     return (
@@ -840,62 +1005,63 @@ Lokasi :${loc || '-'}`;
                           setActiveCardId(card.id);
                           setIsSelectorModalOpen(false);
                         }}
-                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative ${
+                        className={`p-3.5 rounded-xl border transition-all cursor-pointer relative ${
                           isActive
-                            ? 'bg-emerald-500/10 border-emerald-500/60 shadow-lg shadow-emerald-500/10'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                            ? 'bg-blue-50/70 border-blue-400 shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-blue-200 hover:bg-slate-50'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            {/* Category & Store */}
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-amber-300 uppercase tracking-wider">
-                                {card.kategori || 'Umum'}
-                              </span>
-                              {isActive && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 flex items-center gap-1">
-                                  <CheckCircle2 size={10} /> Aktif
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <CharacterAvatar id={card.characterId || 1} className="w-11 h-11 shrink-0 mt-0.5" />
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                {isActive && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#1877f2] text-white flex items-center gap-1">
+                                    <CheckCircle2 size={10} /> Aktif
+                                  </span>
+                                )}
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-[#1877f2] uppercase tracking-wider">
+                                  {primary.bank}
                                 </span>
-                              )}
-                            </div>
+                              </div>
 
-                            <h4 className="text-sm font-bold text-white truncate">
-                              {card.namaToko}
-                            </h4>
+                              <h4 className="text-sm font-bold text-slate-900 truncate">
+                                {card.namaToko}
+                              </h4>
 
-                            <p className="text-xs text-white/60 mt-0.5">
-                              A/N: <strong className="text-white/80">{card.nama}</strong> • HP: {card.nomorHp || '-'}
-                            </p>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                A/N: <strong className="text-slate-700">{primary.atasNama}</strong>
+                              </p>
 
-                            <div className="mt-2 text-xs font-mono text-emerald-300/90 flex items-center gap-2 flex-wrap">
-                              <span>
-                                {primary.bank}: {primary.noRekening}
-                              </span>
-                              {extraBanksCount > 0 && (
-                                <span className="text-[10px] text-white/50 bg-white/10 px-1.5 py-0.5 rounded font-sans">
-                                  +{extraBanksCount} Bank lain
+                              <div className="mt-1 text-xs font-mono text-[#1877f2] flex items-center gap-2 flex-wrap font-semibold">
+                                <span>
+                                  {primary.bank}: {primary.noRekening}
                                 </span>
-                              )}
+                                {extraBanksCount > 0 && (
+                                  <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-sans">
+                                    +{extraBanksCount} Bank lain
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
                           {/* Action Buttons: Edit & Delete */}
                           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                             <button
-                              onClick={() => {
-                                handleOpenEditModal(card);
-                              }}
-                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-                              title="Edit Kartu"
+                              onClick={() => handleOpenEditModal(card)}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-[#1877f2] transition-colors"
+                              title="Edit Supplier"
                             >
                               <Edit3 size={15} />
                             </button>
                             {cards.length > 1 && (
                               <button
                                 onClick={(e) => handleDeleteCard(card.id, e)}
-                                className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-colors"
-                                title="Hapus Kartu"
+                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+                                title="Hapus Supplier"
                               >
                                 <Trash2 size={15} />
                               </button>
@@ -908,13 +1074,13 @@ Lokasi :${loc || '-'}`;
                 )}
               </div>
 
-              {/* Modal Footer: Add Card Button */}
-              <div className="pt-3 border-t border-white/10 shrink-0">
+              {/* Modal Footer: Add Supplier Button */}
+              <div className="pt-3 border-t border-slate-100 shrink-0">
                 <button
-                  onClick={() => handleOpenCreateModal(selectedCategoryFilter)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+                  onClick={handleOpenCreateModal}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#1877f2] hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
                 >
-                  <Plus size={16} /> Tambah Kartu Baru
+                  <Plus size={16} /> Tambah Supplier Baru
                 </button>
               </div>
             </motion.div>
@@ -922,7 +1088,7 @@ Lokasi :${loc || '-'}`;
         )}
       </AnimatePresence>
 
-      {/* POPUP 2: EDIT / TAMBAH KARTU (Dengan Input Multi Bank) */}
+      {/* POPUP: EDIT / TAMBAH KARTU (TANPA KATEGORI & TANPA NOMOR HP) */}
       <AnimatePresence>
         {isEditModalOpen && (
           <>
@@ -931,32 +1097,32 @@ Lokasi :${loc || '-'}`;
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsEditModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[140]"
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-[160]"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[94%] max-w-md bg-zinc-950 border border-white/20 rounded-3xl p-5 sm:p-6 z-[150] shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar"
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[94%] max-w-md bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 z-[170] shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar"
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-white/10">
+              <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1877f2]">
                     <CreditCard size={18} />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white tracking-tight">
-                      {isCreatingNewCard ? 'Tambah Kartu Vendor' : 'Edit Data Kartu Display'}
+                    <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                      {isCreatingNewCard ? 'Tambah Supplier Baru' : 'Edit Data Supplier'}
                     </h3>
-                    <p className="text-[11px] text-white/50">
-                      Bisa input lebih dari 1 bank (masuk ke laporan WA)
+                    <p className="text-xs text-slate-500">
+                      Atur nama toko, karakter, dan rekening bank
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsEditModalOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   <X size={18} />
                 </button>
@@ -964,29 +1130,35 @@ Lokasi :${loc || '-'}`;
 
               {/* Form Content */}
               <form onSubmit={handleSaveCard} className="space-y-4 text-xs">
-                {/* 1. Kategori Selection */}
-                <div>
-                  <label className="block font-semibold text-white/80 mb-1 flex items-center gap-1.5">
-                    <Tag size={13} className="text-amber-400" />
-                    <span>Kategori Kartu :</span>
-                  </label>
-                  <select
-                    value={editCardData.kategori}
-                    onChange={(e) => setEditCardData({ ...editCardData, kategori: e.target.value })}
-                    className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm focus:outline-none"
+                {/* Character Avatar Picker */}
+                <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CharacterAvatar id={editCardData.characterId || 1} className="w-12 h-12 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">
+                        {CHARACTERS.find(c => c.id === (editCardData.characterId || 1))?.name || 'Karakter Kartu'}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {CHARACTERS.find(c => c.id === (editCardData.characterId || 1))?.role || 'Avatar'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCharacterPickerTarget('edit');
+                      setIsCharacterPickerOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-white hover:bg-blue-100 text-[#1877f2] border border-blue-200 font-bold rounded-lg text-xs transition-colors"
                   >
-                    {categories.map(c => (
-                      <option key={c} value={c} className="bg-zinc-900 text-white">
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                    Ganti Karakter (20 Opsi)
+                  </button>
                 </div>
 
-                {/* 2. Nama Toko/Vendor */}
+                {/* 1. Nama Toko/Vendor */}
                 <div>
-                  <label className="block font-semibold text-white/80 mb-1 flex items-center gap-1.5">
-                    <Store size={13} className="text-amber-400" />
+                  <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Store size={13} className="text-[#1877f2]" />
                     <span>Nama Toko / Vendor :</span>
                   </label>
                   <input
@@ -995,75 +1167,44 @@ Lokasi :${loc || '-'}`;
                     value={editCardData.namaToko}
                     onChange={(e) => setEditCardData({ ...editCardData, namaToko: e.target.value })}
                     placeholder="Contoh: TB Rusnawati Jaya"
-                    className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm focus:outline-none"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#1877f2] focus:bg-white rounded-xl text-slate-900 text-sm focus:outline-none"
                   />
                 </div>
 
-                {/* 3. Nama Penerima A/N */}
-                <div>
-                  <label className="block font-semibold text-white/80 mb-1 flex items-center gap-1.5">
-                    <User size={13} className="text-white/60" />
-                    <span>Penerima A/N (Nama) :</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editCardData.nama}
-                    onChange={(e) => setEditCardData({ ...editCardData, nama: e.target.value })}
-                    placeholder="Contoh: Rusnawati"
-                    className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm focus:outline-none"
-                  />
-                </div>
-
-                {/* 4. Nomor HP */}
-                <div>
-                  <label className="block font-semibold text-white/80 mb-1 flex items-center gap-1.5">
-                    <Phone size={13} className="text-emerald-400" />
-                    <span>Nomor HP :</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={editCardData.nomorHp}
-                    onChange={(e) => setEditCardData({ ...editCardData, nomorHp: e.target.value })}
-                    placeholder="Contoh: 08111949322"
-                    className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white text-sm focus:outline-none font-mono"
-                  />
-                </div>
-
-                {/* 5. MULTIPLE BANK ACCOUNTS */}
-                <div className="pt-2 border-t border-white/10">
+                {/* 2. DAFTAR REKENING BANK & A/N (Bisa Banyak Bank) */}
+                <div className="pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5 text-[11px]">
-                      <Building2 size={13} className="text-blue-400" />
+                    <label className="font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 text-[11px]">
+                      <Building2 size={13} className="text-[#1877f2]" />
                       <span>Daftar Rekening Bank ({editCardData.bankAccounts.length})</span>
                     </label>
                     <button
                       type="button"
                       onClick={handleAddBankAccount}
-                      className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
+                      className="text-xs text-[#1877f2] hover:text-blue-700 font-bold flex items-center gap-1"
                     >
                       <Plus size={13} /> + Tambah Bank
                     </button>
                   </div>
-                  <p className="text-[10px] text-white/40 mb-3">
-                    Bank pertama akan jadi display di kartu, namun seluruh bank akan masuk ke laporan WA.
+                  <p className="text-[11px] text-slate-500 mb-3">
+                    Setiap bank dapat memiliki nomor rekening dan A/N masing-masing.
                   </p>
 
                   <div className="space-y-3">
                     {editCardData.bankAccounts.map((account, idx) => (
                       <div 
                         key={account.id || idx}
-                        className="p-3 rounded-2xl bg-black/50 border border-white/10 relative space-y-2"
+                        className="p-3 rounded-xl bg-slate-50 border border-slate-200 relative space-y-2.5"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">
-                            Bank #{idx + 1} {idx === 0 ? '(Utama / Display)' : ''}
+                          <span className="text-[10px] font-bold text-[#1877f2] uppercase tracking-wider">
+                            Bank #{idx + 1} {idx === 0 ? '(Utama)' : ''}
                           </span>
                           {editCardData.bankAccounts.length > 1 && (
                             <button
                               type="button"
                               onClick={() => handleRemoveBankAccount(idx)}
-                              className="text-white/40 hover:text-red-400 p-1"
+                              className="text-slate-400 hover:text-red-500 p-1"
                               title="Hapus Bank Ini"
                             >
                               <Trash2 size={13} />
@@ -1073,13 +1214,14 @@ Lokasi :${loc || '-'}`;
 
                         {/* Bank Name */}
                         <div>
+                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Nama Bank:</label>
                           <input
                             type="text"
                             required
                             value={account.bank}
                             onChange={(e) => handleUpdateBankAccount(idx, 'bank', e.target.value.toUpperCase())}
                             placeholder="Nama Bank (BRI, BCA, dll)"
-                            className="w-full px-2.5 py-1.5 bg-black/70 border border-white/15 rounded-lg text-white font-bold uppercase text-xs focus:outline-none focus:border-amber-400"
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold uppercase text-xs focus:outline-none focus:border-[#1877f2]"
                           />
                           {/* Quick Bank chips */}
                           <div className="flex flex-wrap gap-1 mt-1.5">
@@ -1090,8 +1232,8 @@ Lokasi :${loc || '-'}`;
                                 onClick={() => handleUpdateBankAccount(idx, 'bank', b)}
                                 className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${
                                   account.bank === b
-                                    ? 'bg-blue-500/20 border-blue-500/60 text-blue-300'
-                                    : 'bg-white/5 border-white/10 text-white/50'
+                                    ? 'bg-[#1877f2] text-white border-[#1877f2]'
+                                    : 'bg-white border-slate-200 text-slate-600'
                                 }`}
                               >
                                 {b}
@@ -1102,13 +1244,27 @@ Lokasi :${loc || '-'}`;
 
                         {/* Account Number */}
                         <div>
+                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Nomor Rekening:</label>
                           <input
                             type="text"
                             required
                             value={account.noRekening}
                             onChange={(e) => handleUpdateBankAccount(idx, 'noRekening', e.target.value)}
                             placeholder="Nomor Rekening"
-                            className="w-full px-2.5 py-1.5 bg-black/70 border border-white/15 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono text-xs focus:outline-none focus:border-[#1877f2]"
+                          />
+                        </div>
+
+                        {/* Atas Nama (A/N) */}
+                        <div>
+                          <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Penerima A/N :</label>
+                          <input
+                            type="text"
+                            required
+                            value={account.atasNama}
+                            onChange={(e) => handleUpdateBankAccount(idx, 'atasNama', e.target.value)}
+                            placeholder="Contoh: Rusnawati"
+                            className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs focus:outline-none focus:border-[#1877f2]"
                           />
                         </div>
                       </div>
@@ -1117,22 +1273,101 @@ Lokasi :${loc || '-'}`;
                 </div>
 
                 {/* Submit & Cancel */}
-                <div className="flex items-center gap-3 pt-3 mt-4 border-t border-white/10">
+                <div className="flex items-center gap-3 pt-3 mt-4 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(false)}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-colors"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold shadow-lg shadow-amber-500/20 transition-all"
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-[#1877f2] hover:bg-blue-700 text-white font-bold shadow-xs transition-all"
                   >
                     {isCreatingNewCard ? 'Simpan Kartu' : 'Simpan Perubahan'}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP: CHARACTER PICKER MODAL (20 OPSI KARAKTER) */}
+      <AnimatePresence>
+        {isCharacterPickerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsCharacterPickerOpen(false)}
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-[180]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[94%] max-w-lg bg-white border border-slate-200 rounded-2xl p-5 z-[190] shadow-2xl flex flex-col max-h-[85vh]"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={18} className="text-[#1877f2]" />
+                  <h3 className="text-base font-bold text-slate-900">
+                    Pilih Karakter Kartu (20 Opsi)
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsCharacterPickerOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto py-4 grid grid-cols-2 sm:grid-cols-4 gap-3 custom-scrollbar">
+                {CHARACTERS.map((char) => {
+                  const currentSelectedId = characterPickerTarget === 'current' 
+                    ? (currentCard.characterId || 1) 
+                    : (editCardData.characterId || 1);
+                  const isSelected = char.id === currentSelectedId;
+
+                  return (
+                    <button
+                      key={char.id}
+                      onClick={() => handleSelectCharacter(char.id)}
+                      className={`p-3 rounded-xl border flex flex-col items-center text-center transition-all ${
+                        isSelected 
+                          ? 'bg-blue-50 border-[#1877f2] shadow-xs' 
+                          : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <CharacterAvatar id={char.id} className="w-14 h-14 mb-2" />
+                      <span className="text-xs font-bold text-slate-900 line-clamp-1">
+                        {char.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">
+                        {char.role}
+                      </span>
+                      {isSelected && (
+                        <span className="mt-1 text-[9px] font-bold text-[#1877f2] bg-blue-100 px-1.5 py-0.5 rounded-full">
+                          ✓ Terpilih
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 shrink-0 text-right">
+                <button
+                  onClick={() => setIsCharacterPickerOpen(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs"
+                >
+                  Tutup
+                </button>
+              </div>
             </motion.div>
           </>
         )}
